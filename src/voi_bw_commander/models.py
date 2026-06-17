@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from dataclasses import asdict
 from enum import Enum
 from time import time
 from typing import Any
@@ -89,6 +90,13 @@ class VerifierExpectation:
             return self.value in actual, f"{self.metric} contains {self.value}: {actual}"
         raise ValueError(f"unsupported verifier operator: {self.operator}")
 
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "VerifierExpectation":
+        return cls(**data)
+
 
 @dataclass
 class ParsedCommand:
@@ -115,6 +123,39 @@ class ParsedCommand:
             "payload": self.payload,
         }
 
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "command_type": self.command_type.value,
+            "action": self.action,
+            "scope": self.scope,
+            "priority": self.priority.value,
+            "strength": self.strength,
+            "duration": self.duration,
+            "payload": self.payload,
+            "expectations": [expectation.to_dict() for expectation in self.expectations],
+            "command_id": self.command_id,
+            "utterance_id": self.utterance_id,
+            "confidence": self.confidence,
+            "ambiguity_score": self.ambiguity_score,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "ParsedCommand":
+        return cls(
+            command_type=CommandType(data["command_type"]),
+            action=data["action"],
+            scope=data.get("scope", "global"),
+            priority=IntentPriority(data.get("priority", IntentPriority.PREFERRED.value)),
+            strength=float(data.get("strength", 1.0)),
+            duration=data.get("duration", "until_cancelled"),
+            payload=dict(data.get("payload", {})),
+            expectations=[VerifierExpectation.from_dict(item) for item in data.get("expectations", [])],
+            command_id=data.get("command_id", f"cmd_{uuid4().hex}"),
+            utterance_id=data.get("utterance_id"),
+            confidence=float(data.get("confidence", 1.0)),
+            ambiguity_score=float(data.get("ambiguity_score", 0.0)),
+        )
+
 
 @dataclass
 class CapabilityManifest:
@@ -124,6 +165,27 @@ class CapabilityManifest:
     supported_actions: set[str]
     integration_level: int
     notes: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "backend_name": self.backend_name,
+            "race_support": sorted(race.value for race in self.race_support),
+            "capabilities": sorted(capability.value for capability in self.capabilities),
+            "supported_actions": sorted(self.supported_actions),
+            "integration_level": self.integration_level,
+            "notes": self.notes,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "CapabilityManifest":
+        return cls(
+            backend_name=data["backend_name"],
+            race_support={Race(item) for item in data["race_support"]},
+            capabilities={BackendCapability(item) for item in data["capabilities"]},
+            supported_actions=set(data["supported_actions"]),
+            integration_level=int(data["integration_level"]),
+            notes=data.get("notes", ""),
+        )
 
     def supports(self, race: Race, command: ParsedCommand) -> tuple[bool, str]:
         if command.action == "set_race":
@@ -213,6 +275,41 @@ class StrategicContract:
             self.backend_bot = backend
         self.style.update(payload.get("style", {}))
 
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "race": self.race.value,
+            "backend_bot": self.backend_bot,
+            "style": dict(self.style),
+            "strategic_commitments": {
+                key: command.to_dict() for key, command in self.strategic_commitments.items()
+            },
+            "hard_goals": {key: command.to_dict() for key, command in self.hard_goals.items()},
+            "standing_orders": {key: command.to_dict() for key, command in self.standing_orders.items()},
+            "instant_orders": {key: command.to_dict() for key, command in self.instant_orders.items()},
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "StrategicContract":
+        return cls(
+            race=Race(data.get("race", Race.UNKNOWN.value)),
+            backend_bot=data.get("backend_bot", "unselected"),
+            style=dict(data.get("style", {})) or cls().style,
+            strategic_commitments={
+                key: ParsedCommand.from_dict(value)
+                for key, value in data.get("strategic_commitments", {}).items()
+            },
+            hard_goals={
+                key: ParsedCommand.from_dict(value) for key, value in data.get("hard_goals", {}).items()
+            },
+            standing_orders={
+                key: ParsedCommand.from_dict(value)
+                for key, value in data.get("standing_orders", {}).items()
+            },
+            instant_orders={
+                key: ParsedCommand.from_dict(value) for key, value in data.get("instant_orders", {}).items()
+            },
+        )
+
 
 @dataclass
 class IntentState:
@@ -246,3 +343,36 @@ class IntentState:
             "standing_orders": len(self.contract.standing_orders),
             "version": self.version,
         }
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "version": self.version,
+            "contract": self.contract.to_dict(),
+            "memory": {
+                "active": {key: command.to_dict() for key, command in self.memory.active.items()},
+                "completed": list(self.memory.completed),
+                "cancelled": list(self.memory.cancelled),
+                "superseded": list(self.memory.superseded),
+                "blocked": list(self.memory.blocked),
+                "unsafe": list(self.memory.unsafe),
+                "degraded": list(self.memory.degraded),
+            },
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "IntentState":
+        state = cls(
+            contract=StrategicContract.from_dict(data.get("contract", {})),
+            version=int(data.get("version", 0)),
+        )
+        memory = data.get("memory", {})
+        state.memory.active = {
+            key: ParsedCommand.from_dict(value) for key, value in memory.get("active", {}).items()
+        }
+        state.memory.completed = list(memory.get("completed", []))
+        state.memory.cancelled = list(memory.get("cancelled", []))
+        state.memory.superseded = list(memory.get("superseded", []))
+        state.memory.blocked = list(memory.get("blocked", []))
+        state.memory.unsafe = list(memory.get("unsafe", []))
+        state.memory.degraded = list(memory.get("degraded", []))
+        return state

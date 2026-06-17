@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Voi BW Commander ParsedCommand",
+  "type": "object",
+  "required": ["command_type", "action", "payload"],
+  "properties": {
+    "command_type": {
+      "enum": [
+        "instant_order",
+        "hard_goal",
+        "persistent_style",
+        "strategic_commitment",
+        "micro_doctrine",
+        "contract_patch"
+      ]
+    },
+    "action": { "type": "string", "minLength": 1 },
+    "scope": { "type": "string" },
+    "priority": {
+      "enum": ["advisory", "preferred", "hard", "urgent", "emergency"]
+    },
+    "strength": { "type": "number", "minimum": 0, "maximum": 1 },
+    "duration": { "type": "string" },
+    "payload": { "type": "object" },
+    "expectations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["metric", "operator", "value"],
+        "properties": {
+          "metric": { "type": "string" },
+          "operator": { "enum": [">=", "<=", "==", "contains"] },
+          "value": {},
+          "window_frames": { "type": ["integer", "null"] },
+          "description": { "type": "string" }
+        }
+      }
+    }
+  }
+}

@@ -5,12 +5,18 @@ import json
 from pathlib import Path
 
 from .adapters import BotAdapter
+from .audit import audit_source_tree
 from .arbiter import ActionCandidate, IntentArbiter
 from .backends import BACKEND_CANDIDATES, default_manifest
+from .llm import StrictLLMCommandParser
 from .models import CommandStatus, CommandUtterance, IntentState
 from .parser import parse_utterance
 from .queue import CommandQueue, command_to_dict
+from .replay_report import build_report
+from .runner import MatchSpec
 from .safety import SafetyPolicy
+from .store import StateStore
+from .telemetry import TelemetryLog
 from .verifier import Verifier
 
 
@@ -24,21 +30,49 @@ def main(argv: list[str] | None = None) -> int:
 
     apply_cmd = sub.add_parser("apply", help="Apply a natural-language command to an intent state.")
     apply_cmd.add_argument("text")
+    apply_cmd.add_argument("--state", type=Path)
+    apply_cmd.add_argument("--telemetry", type=Path)
 
     sub.add_parser("candidates", help="Print backend commandability candidates.")
 
     verify_cmd = sub.add_parser("verify-demo", help="Run a deterministic verifier demo.")
     verify_cmd.add_argument("text")
 
+    llm_cmd = sub.add_parser("parse-llm-json", help="Validate strict LLM JSON output.")
+    llm_cmd.add_argument("json_text")
+
+    report_cmd = sub.add_parser("report", help="Build a report from telemetry JSONL.")
+    report_cmd.add_argument("telemetry", type=Path)
+
+    audit_cmd = sub.add_parser("audit-source", help="Audit a backend source tree for commandability.")
+    audit_cmd.add_argument("backend")
+    audit_cmd.add_argument("path", type=Path)
+
+    plan_cmd = sub.add_parser("match-plan", help="Print an external BWAPI match execution plan.")
+    plan_cmd.add_argument("--bot", required=True)
+    plan_cmd.add_argument("--opponent", required=True)
+    plan_cmd.add_argument("--race", required=True)
+    plan_cmd.add_argument("--map", required=True, dest="map_name")
+    plan_cmd.add_argument("--queue", required=True, type=Path)
+    plan_cmd.add_argument("--telemetry", required=True, type=Path)
+
     args = parser.parse_args(argv)
     if args.command == "parse":
         return _parse(args.text, args.queue)
     if args.command == "apply":
-        return _apply(args.text)
+        return _apply(args.text, args.state, args.telemetry)
     if args.command == "candidates":
         return _candidates()
     if args.command == "verify-demo":
         return _verify_demo(args.text)
+    if args.command == "parse-llm-json":
+        return _parse_llm_json(args.json_text)
+    if args.command == "report":
+        return _report(args.telemetry)
+    if args.command == "audit-source":
+        return _audit_source(args.backend, args.path)
+    if args.command == "match-plan":
+        return _match_plan(args.bot, args.opponent, args.race, args.map_name, args.queue, args.telemetry)
     raise AssertionError("unreachable")
 
 
@@ -51,8 +85,9 @@ def _parse(text: str, queue_path: Path | None) -> int:
     return 0
 
 
-def _apply(text: str) -> int:
-    state = IntentState()
+def _apply(text: str, state_path: Path | None = None, telemetry_path: Path | None = None) -> int:
+    store = StateStore(state_path) if state_path else None
+    state = store.load() if store else IntentState()
     manifest = default_manifest()
     adapter = BotAdapter(manifest)
     policy = SafetyPolicy()
@@ -65,6 +100,13 @@ def _apply(text: str) -> int:
         else:
             state.memory.record(command, decision.status, decision.reason)
     result = adapter.apply(state, safe_commands)
+    if store:
+        store.save(state)
+    if telemetry_path:
+        telemetry = TelemetryLog(telemetry_path)
+        for event in result.accepted + result.degraded + result.rejected:
+            telemetry.write("command_status", event)
+        telemetry.write("contract_snapshot", adapter.runtime_payload(state))
     arbiter = IntentArbiter()
     choice = arbiter.choose(
         state,
@@ -118,6 +160,37 @@ def _verify_demo(text: str) -> int:
     }
     result = Verifier().verify(state, telemetry)
     print(json.dumps(result.__dict__, ensure_ascii=False, indent=2, sort_keys=True))
+    return 0
+
+
+def _parse_llm_json(json_text: str) -> int:
+    commands = StrictLLMCommandParser().parse_json(json_text)
+    print(json.dumps([command_to_dict(command) for command in commands], ensure_ascii=False, indent=2))
+    return 0
+
+
+def _report(telemetry_path: Path) -> int:
+    report = build_report(TelemetryLog(telemetry_path).read())
+    print(json.dumps(report.to_dict(), ensure_ascii=False, indent=2, sort_keys=True))
+    return 0
+
+
+def _audit_source(backend: str, path: Path) -> int:
+    report = audit_source_tree(backend, path)
+    print(json.dumps(report.to_dict(), ensure_ascii=False, indent=2, sort_keys=True))
+    return 0
+
+
+def _match_plan(
+    bot: str,
+    opponent: str,
+    race: str,
+    map_name: str,
+    queue: Path,
+    telemetry: Path,
+) -> int:
+    spec = MatchSpec(bot=bot, opponent=opponent, race=race, map_name=map_name, command_queue=queue, telemetry_log=telemetry)
+    print(json.dumps({"plan": spec.to_command_plan()}, ensure_ascii=False, indent=2))
     return 0
 
 

@@ -21,6 +21,14 @@ This repository now contains a runnable commander-core vertical slice:
 - verifier demo
 - backend commandability audit docs
 - local tests
+- strict LLM JSON schema gate
+- persisted state store
+- telemetry JSONL writer
+- replay/telemetry report builder
+- source-tree commandability audit CLI
+- external match execution plan generator
+- C++ bot-side queue polling bridge template
+- GitHub Actions CI
 
 Run local verification:
 
@@ -28,6 +36,7 @@ Run local verification:
 python3 -m pytest
 PYTHONPATH=src python3 -m voi_bw_commander.cli apply "저그로 해. 드론 5개 더 찍고 2햇 뮤탈. 침략적으로 가되 정면 싸움은 피하고 일꾼만 흔들어."
 PYTHONPATH=src python3 -m voi_bw_commander.cli verify-demo "저그 드론 5개 더 2햇 뮤탈 견제 일꾼만"
+PYTHONPATH=src python3 -m voi_bw_commander.cli match-plan --bot Steamhammer --opponent PurpleWave --race Zerg --map FightingSpirit --queue runtime/commands.jsonl --telemetry runtime/telemetry.jsonl
 ```
 
 Actual Brood War execution still requires a concrete BWAPI bot repository, Brood War 1.16.1-compatible runtime, BWAPI-compatible setup, maps, and bot-side source hooks. Those are intentionally separated behind the adapter and commandability audit contracts.

@@ -21,6 +21,39 @@ Default queue format is JSON Lines. Each line is a validated `ParsedCommand` dic
 python -m voi_bw_commander.cli parse "저그 드론 5개 더" --queue runtime/commands.jsonl
 ```
 
+## Stateful Commander Run
+
+```bash
+PYTHONPATH=src python3 -m voi_bw_commander.cli apply \
+  "저그로 해. 드론 5개 더 찍고 2햇 뮤탈. 침략적으로 가되 정면 싸움은 피하고 일꾼만 흔들어." \
+  --state runtime/state.json \
+  --telemetry runtime/telemetry.jsonl
+```
+
+## Report Generation
+
+```bash
+PYTHONPATH=src python3 -m voi_bw_commander.cli report runtime/telemetry.jsonl
+```
+
+## Backend Audit
+
+```bash
+PYTHONPATH=src python3 -m voi_bw_commander.cli audit-source Steamhammer third_party/Steamhammer
+```
+
+## Match Plan
+
+```bash
+PYTHONPATH=src python3 -m voi_bw_commander.cli match-plan \
+  --bot Steamhammer \
+  --opponent PurpleWave \
+  --race Zerg \
+  --map FightingSpirit \
+  --queue runtime/commands.jsonl \
+  --telemetry runtime/telemetry.jsonl
+```
+
 ## Required External Runtime
 
 Actual Brood War execution requires:
