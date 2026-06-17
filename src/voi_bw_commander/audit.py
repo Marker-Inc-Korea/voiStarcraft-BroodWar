@@ -42,7 +42,7 @@ def audit_source_tree(backend: str, root: Path) -> AuditReport:
                 pass
     haystack = names + "\n" + contents
     checks = {
-        "build": ["cmakelists", ".sln", "build.gradle", "sbt", "makefile"],
+        "build": ["cmakelists", ".sln", "build.gradle", ".sbt", "makefile", "pom.xml"],
         "strategy": ["strategy", "opening", "buildorder", "build order"],
         "production": ["production", "queue", "train", "morph"],
         "squad": ["squad", "combat", "attack", "retreat"],
