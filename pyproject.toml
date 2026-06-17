@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "voi-bw-commander"
+version = "0.1.0"
+description = "Natural-language commander core for autonomous StarCraft: Brood War BWAPI bots."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Marker Inc Korea" }]
+dependencies = []
+
+[project.scripts]
+voi-bw-commander = "voi_bw_commander.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-p no:rerunfailures"
