@@ -33,12 +33,73 @@ This project is valuable only if the command layer changes long-running behavior
 
 Not every strong Brood War bot is a good commandable backend. Backend selection must prioritize full-game capability, source availability, BWAPI or BWAPI-wrapper integration, maintainability, and runtime injection points. Strong binary-only or hard-to-modify bots should be treated as benchmark opponents first.
 
-The safest product path is:
+The safest product path is not to shrink the final target. It is to reach the full target through production vertical slices where every slice preserves the final architecture:
 
-1. Prove the commander UX with one all-race backend.
-2. Add deeper per-race adapters for the best modifiable bots.
-3. Add benchmark-only strong bots for evaluation.
-4. Add replay-based verification to prove that intent actually changed behavior.
+1. First make the complete end-to-end loop work with one backend.
+2. Then deepen the strongest source-modifiable backend into a real commandable executor.
+3. Keep benchmark-only strong bots for strength evaluation.
+4. Keep replay-based verification mandatory so intent adherence is proven, not assumed.
+
+## Strongest-Bot Strategy
+
+The ideal product uses the strongest available full-game bot as the executor. The practical constraint is that "strongest" and "commandable" are not the same property.
+
+To make the strongest bot play according to user intent, the project must have source-level access to the decision points that matter:
+
+- strategy selection
+- build order selection
+- production queue scoring
+- expansion timing
+- army posture and attack thresholds
+- squad target selection
+- micro target priority
+- retreat and safety rules
+- telemetry emission
+
+If the strongest bot exposes these decision points, it should be aggressively adapted as the primary backend. If it does not, forcing commands only through external unit control would make the bot weaker and less stable because it fights the bot's own planners. In that case, it belongs in the benchmark pool until a source-level integration path is proven.
+
+The production plan therefore includes a `commandability audit` before backend commitment:
+
+| Audit item | Required evidence |
+| --- | --- |
+| Build/run access | Reproducible local build and bot launch. |
+| Decision hooks | Identified strategy, production, squad, and micro injection points. |
+| Runtime command path | Safe file/socket/on-frame command ingestion. |
+| Safety ownership | Clear conflict handling between user intent and bot survival logic. |
+| Telemetry ownership | Events emitted for every accepted, blocked, or overridden command. |
+
+## Deep Intent Model
+
+The intent model must represent more than a flat command list. It must preserve user meaning, persistence, priority, conflicts, verification rules, and adaptation rights.
+
+Core objects:
+
+- `CommandUtterance`: raw user text, language, timestamp, source, confidence.
+- `ParsedCommand`: structured interpretation with alternatives and ambiguity score.
+- `StrategicContract`: the current agreement between user and bot.
+- `IntentState`: active long-lived state that affects every decision tick.
+- `IntentMemory`: completed, cancelled, superseded, blocked, and safety-overridden intent history.
+- `VerifierExpectation`: measurable condition attached to each intent.
+- `CapabilityManifest`: backend-specific support and degradation rules.
+
+Intent fields:
+
+- scope: global, race, economy, production, tech, squad, unit type, map region, timing window.
+- priority: advisory, preferred, hard, urgent, emergency.
+- duration: ttl frames, until fulfilled, until cancelled, until invalid, until strategic phase change.
+- strength: numeric bias used by the arbiter.
+- adaptivity: fixed, adaptive, opportunistic, safety-breakable.
+- conflict policy: stack, replace, suppress, require confirmation, safety override.
+- verification: exact goal, statistical metric, replay-derived metric, manual review.
+
+This model is necessary for commands like:
+
+```text
+"아까 말한 침략 스타일은 유지하되, 이제 3멀티는 먹어.
+뮤탈은 일꾼만 흔들고 정면 싸움은 계속 피해."
+```
+
+The system must patch the existing contract instead of replacing the whole strategy.
 
 ## Backend Strategy
 
@@ -55,7 +116,7 @@ The safest product path is:
 
 | Race | Primary commandable target | Secondary target | Benchmark/fallback |
 | --- | --- | --- | --- |
-| All-race MVP | Steamhammer or PurpleWave | UAlbertaBot for reference | PurpleWave |
+| All-race vertical slice | Steamhammer or PurpleWave | UAlbertaBot for reference | PurpleWave |
 | Zerg | McRave | Steamhammer-Zerg, ZZZKBot | PurpleWave-Zerg |
 | Protoss | Stardust | Locutus | PurpleWave-Protoss |
 | Terran | Ecgberht or LetaBot | LetaBot or Ecgberht | SAIDA, Iron, PurpleWave-Terran |
@@ -118,6 +179,18 @@ Commands are normalized into an `IntentState`, not directly translated into clic
   }
 }
 ```
+
+The production `IntentState` should also include contract history, ambiguity handling, backend capability degradation, verifier expectations, and safety override metadata. A command is not complete until the runtime can explain one of these statuses:
+
+- accepted
+- active
+- fulfilled
+- blocked
+- unsafe
+- invalid
+- superseded
+- degraded by backend capability
+- cancelled
 
 ## Command Classes
 
@@ -191,27 +264,34 @@ Telemetry + Replay Verifier
 
 ## Implementation Plan
 
-### Phase 0: Repository and research baseline
+### Phase 0: Repository, research baseline, and commandability audit
 
 Deliverables:
 
 - Project README and architecture decision record.
-- GitHub Issues for MVP, V1, V2, and verifier workstreams.
+- GitHub Issues for the complete production target.
 - Backend candidate matrix with integration levels.
+- Strongest-bot commandability audit.
+- Reproducible build/run notes for chosen backend candidates.
 
 Exit criteria:
 
 - The repo states the long-term goal, constraints, and staged implementation plan.
 - Every major milestone is represented as a GitHub Issue.
+- The primary backend is selected by strength and commandability, not popularity.
 
-### Phase 1: Commander core MVP
+### Phase 1: Commander core and deep intent ontology
 
 Deliverables:
 
 - `CommandDSL` JSON schema.
 - `IntentState` data model.
+- `StrategicContract` model.
+- `IntentMemory` model.
+- `VerifierExpectation` model.
+- `CapabilityManifest` model.
 - Deterministic parser fixtures for core Korean commands.
-- Optional LLM parser wrapper with strict schema validation.
+- LLM parser wrapper with strict schema validation and deterministic fallback.
 - In-memory and file-backed command queue.
 
 Supported commands:
@@ -223,8 +303,10 @@ Supported commands:
 Exit criteria:
 
 - Commands can be parsed, validated, merged, cancelled, and replayed in tests.
+- Ambiguous commands produce alternatives or safe clarification requirements.
+- Every accepted command receives verification expectations.
 
-### Phase 2: BWAPI bridge and all-race backend MVP
+### Phase 2: BWAPI bridge and production vertical slice
 
 Deliverables:
 
@@ -232,11 +314,13 @@ Deliverables:
 - File or socket queue consumed by the bot on frame ticks.
 - First backend adapter using Steamhammer or PurpleWave.
 - Capability manifest for each backend.
+- Bot build, launch, config, replay, and logging harness.
 
 Exit criteria:
 
 - A full-game bot can start, receive command queue updates, and expose telemetry events.
 - At least one all-race backend can apply worker goals and high-level style bias.
+- The loop covers natural-language input through replay/verifier output, even if early capability depth is limited.
 
 ### Phase 3: Intent arbiter integration
 
@@ -266,10 +350,11 @@ Exit criteria:
 - Race-neutral commands map to legal race-specific goals.
 - Illegal commands produce safe, explainable validation errors.
 
-### Phase 5: V1 race-specific adapters
+### Phase 5: strongest-backend and race-specific adapters
 
 Deliverables:
 
+- Source-level strongest-backend adapter if the commandability audit passes.
 - Zerg adapter spike: McRave or Steamhammer-Zerg.
 - Protoss adapter spike: Stardust or Locutus.
 - Terran adapter spike: Ecgberht or LetaBot.
@@ -278,6 +363,7 @@ Deliverables:
 Exit criteria:
 
 - At least one race-specific backend reaches integration level 3 or higher.
+- The strongest practical backend is either promoted to commandable or explicitly retained as benchmark-only with evidence.
 
 ### Phase 6: Verifier and reports
 
@@ -305,6 +391,23 @@ Deliverables:
 Exit criteria:
 
 - Product changes are measured against strength, stability, and command adherence.
+
+### Phase 8: production hardening
+
+Deliverables:
+
+- CI for schema tests, parser fixtures, adapter unit tests, and report generation.
+- Reproducible environment setup for Brood War 1.16.1, BWAPI, bot binaries, maps, and replay folders.
+- Crash recovery and corrupted command queue handling.
+- Structured logs for commander service and bot runtime.
+- Versioned schema migrations.
+- Operator runbooks.
+
+Exit criteria:
+
+- A new developer can reproduce the commanded bot loop from documentation.
+- Failed games produce actionable logs and reports.
+- Schema or adapter regressions are caught before release.
 
 ## Integration Levels
 
