@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from .models import ParsedCommand, VerifierExpectation
+from .schema import parse_command_dict
 
 
 def command_to_dict(command: ParsedCommand) -> dict[str, Any]:
@@ -37,6 +38,9 @@ class CommandQueue:
                 if line:
                     items.append(json.loads(line))
         return items
+
+    def read_commands(self) -> list[ParsedCommand]:
+        return [parse_command_dict(item) for item in self.read_raw()]
 
     def clear(self) -> None:
         self.path.write_text("", encoding="utf-8")

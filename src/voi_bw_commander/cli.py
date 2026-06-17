@@ -12,6 +12,7 @@ from .llm import StrictLLMCommandParser
 from .models import CommandStatus, CommandUtterance, IntentState
 from .parser import parse_utterance
 from .queue import CommandQueue, command_to_dict
+from .readiness import check_runtime
 from .replay_report import build_report
 from .runner import MatchSpec
 from .safety import SafetyPolicy
@@ -56,6 +57,9 @@ def main(argv: list[str] | None = None) -> int:
     plan_cmd.add_argument("--queue", required=True, type=Path)
     plan_cmd.add_argument("--telemetry", required=True, type=Path)
 
+    ready_cmd = sub.add_parser("readiness", help="Check repository-side production readiness assets.")
+    ready_cmd.add_argument("--root", type=Path, default=Path.cwd())
+
     args = parser.parse_args(argv)
     if args.command == "parse":
         return _parse(args.text, args.queue)
@@ -73,6 +77,8 @@ def main(argv: list[str] | None = None) -> int:
         return _audit_source(args.backend, args.path)
     if args.command == "match-plan":
         return _match_plan(args.bot, args.opponent, args.race, args.map_name, args.queue, args.telemetry)
+    if args.command == "readiness":
+        return _readiness(args.root)
     raise AssertionError("unreachable")
 
 
@@ -191,6 +197,12 @@ def _match_plan(
 ) -> int:
     spec = MatchSpec(bot=bot, opponent=opponent, race=race, map_name=map_name, command_queue=queue, telemetry_log=telemetry)
     print(json.dumps({"plan": spec.to_command_plan()}, ensure_ascii=False, indent=2))
+    return 0
+
+
+def _readiness(root: Path) -> int:
+    report = check_runtime(root)
+    print(json.dumps(report.to_dict(), ensure_ascii=False, indent=2, sort_keys=True))
     return 0
 
 

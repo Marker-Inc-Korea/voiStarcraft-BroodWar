@@ -54,6 +54,23 @@ PYTHONPATH=src python3 -m voi_bw_commander.cli match-plan \
   --telemetry runtime/telemetry.jsonl
 ```
 
+## Readiness Check
+
+```bash
+PYTHONPATH=src python3 -m voi_bw_commander.cli readiness --root .
+```
+
+## Apply PurpleWave Integration
+
+After checking out PurpleWave to `third_party/PurpleWave`, apply the source templates:
+
+```bash
+python3 scripts/apply_purplewave_integration.py third_party/PurpleWave --dry-run
+python3 scripts/apply_purplewave_integration.py third_party/PurpleWave
+```
+
+The script copies commander integration sources to `src/Commander` and inserts the queue consumer poll into `src/Lifecycle/PurpleWave.scala`.
+
 ## Required External Runtime
 
 Actual Brood War execution requires:

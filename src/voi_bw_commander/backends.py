@@ -82,6 +82,7 @@ def default_manifest(name: str = "SteamhammerVerticalSlice") -> CapabilityManife
             BackendCapability.LAUNCH_CONFIG,
             BackendCapability.PERSISTENT_STYLE,
             BackendCapability.OBJECTIVE_INJECTION,
+            BackendCapability.MICRO_DOCTRINE,
             BackendCapability.FULL_TELEMETRY,
         },
         supported_actions={
@@ -89,10 +90,11 @@ def default_manifest(name: str = "SteamhammerVerticalSlice") -> CapabilityManife
             "produce_worker",
             "set_style",
             "commit_strategy",
+            "set_micro_doctrine",
             "attack",
             "retreat",
             "patch_contract",
         },
-        integration_level=3,
-        notes="Local vertical-slice manifest. Real bot hooks require commandability audit.",
+        integration_level=4,
+        notes="Local production contract manifest. Real bot hooks require commandability audit and source patch.",
     )
