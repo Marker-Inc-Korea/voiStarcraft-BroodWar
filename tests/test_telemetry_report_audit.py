@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from voi_bw_commander.audit import audit_source_tree
+from voi_bw_commander.audit import audit_source_tree, decide_commandability
 from voi_bw_commander.replay_report import build_report, compare_reports
 from voi_bw_commander.telemetry import TelemetryLog
 
@@ -33,6 +33,20 @@ def test_audit_source_tree_detects_hooks(tmp_path: Path) -> None:
     report = audit_source_tree("FakeBot", tmp_path)
 
     assert report.promotable
+    decision = decide_commandability(report)
+    assert decision.role == "commandable_backend"
+    assert decision.primary_candidate
+
+
+def test_commandability_decision_keeps_missing_hooks_as_benchmark(tmp_path: Path) -> None:
+    (tmp_path / "README.md").write_text("strong bot binary only", encoding="utf-8")
+
+    report = audit_source_tree("StrongBinaryOnly", tmp_path)
+    decision = decide_commandability(report)
+
+    assert decision.role == "benchmark_only"
+    assert not decision.primary_candidate
+    assert "external_unit_control" in decision.forbidden_integration_modes
 
 
 def test_compare_reports_computes_commanded_deltas(tmp_path) -> None:
