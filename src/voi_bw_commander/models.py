@@ -59,6 +59,21 @@ class BackendCapability(StrEnum):
     FULL_TELEMETRY = "full_telemetry"
 
 
+class IntentAdaptivity(StrEnum):
+    FIXED = "fixed"
+    ADAPTIVE = "adaptive"
+    OPPORTUNISTIC = "opportunistic"
+    SAFETY_BREAKABLE = "safety_breakable"
+
+
+class ConflictPolicy(StrEnum):
+    STACK = "stack"
+    REPLACE_SCOPE = "replace_scope"
+    SUPPRESS_LOWER_PRIORITY = "suppress_lower_priority"
+    REQUIRE_CONFIRMATION = "require_confirmation"
+    SAFETY_OVERRIDE = "safety_override"
+
+
 @dataclass(frozen=True)
 class CommandUtterance:
     text: str
@@ -108,6 +123,8 @@ class ParsedCommand:
     duration: str = "until_cancelled"
     payload: dict[str, Any] = field(default_factory=dict)
     expectations: list[VerifierExpectation] = field(default_factory=list)
+    adaptivity: IntentAdaptivity = IntentAdaptivity.ADAPTIVE
+    conflict_policy: ConflictPolicy = ConflictPolicy.STACK
     command_id: str = field(default_factory=lambda: f"cmd_{uuid4().hex}")
     utterance_id: str | None = None
     confidence: float = 1.0
@@ -133,6 +150,8 @@ class ParsedCommand:
             "duration": self.duration,
             "payload": self.payload,
             "expectations": [expectation.to_dict() for expectation in self.expectations],
+            "adaptivity": self.adaptivity.value,
+            "conflict_policy": self.conflict_policy.value,
             "command_id": self.command_id,
             "utterance_id": self.utterance_id,
             "confidence": self.confidence,
@@ -150,6 +169,8 @@ class ParsedCommand:
             duration=data.get("duration", "until_cancelled"),
             payload=dict(data.get("payload", {})),
             expectations=[VerifierExpectation.from_dict(item) for item in data.get("expectations", [])],
+            adaptivity=IntentAdaptivity(data.get("adaptivity", IntentAdaptivity.ADAPTIVE.value)),
+            conflict_policy=ConflictPolicy(data.get("conflict_policy", ConflictPolicy.STACK.value)),
             command_id=data.get("command_id", f"cmd_{uuid4().hex}"),
             utterance_id=data.get("utterance_id"),
             confidence=float(data.get("confidence", 1.0)),
@@ -274,6 +295,10 @@ class StrategicContract:
         if backend := payload.get("backend_bot"):
             self.backend_bot = backend
         self.style.update(payload.get("style", {}))
+        if not payload.get("preserve_existing", False):
+            return
+        # Patch commands intentionally keep existing goals and doctrines unless
+        # a later command with a scoped replacement policy supersedes them.
 
     def to_dict(self) -> dict[str, Any]:
         return {

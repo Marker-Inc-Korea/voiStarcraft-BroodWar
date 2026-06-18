@@ -88,6 +88,7 @@ def default_manifest(name: str = "SteamhammerVerticalSlice") -> CapabilityManife
         supported_actions={
             "set_race",
             "produce_worker",
+            "take_expansion",
             "set_style",
             "commit_strategy",
             "set_micro_doctrine",

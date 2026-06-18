@@ -3,8 +3,10 @@ from __future__ import annotations
 import re
 
 from .models import (
+    ConflictPolicy,
     CommandType,
     CommandUtterance,
+    IntentAdaptivity,
     IntentPriority,
     ParsedCommand,
     Race,
@@ -53,6 +55,8 @@ def parse_utterance(utterance: CommandUtterance) -> list[ParsedCommand]:
                 scope="economy",
                 priority=IntentPriority.HARD,
                 duration="until_fulfilled_or_invalid",
+                adaptivity=IntentAdaptivity.SAFETY_BREAKABLE,
+                conflict_policy=ConflictPolicy.SUPPRESS_LOWER_PRIORITY,
                 payload={"count": worker_count, "mode": "delta"},
                 expectations=[
                     VerifierExpectation(
@@ -60,6 +64,30 @@ def parse_utterance(utterance: CommandUtterance) -> list[ParsedCommand]:
                         operator=">=",
                         value=worker_count,
                         description=f"worker count increases by {worker_count}",
+                    )
+                ],
+                utterance_id=utterance.utterance_id,
+            )
+        )
+
+    expansion_goal = _parse_expansion_goal(lower)
+    if expansion_goal:
+        commands.append(
+            ParsedCommand(
+                command_type=CommandType.HARD_GOAL,
+                action="take_expansion",
+                scope="economy",
+                priority=IntentPriority.HARD,
+                duration="until_fulfilled_or_invalid",
+                adaptivity=IntentAdaptivity.SAFETY_BREAKABLE,
+                conflict_policy=ConflictPolicy.SUPPRESS_LOWER_PRIORITY,
+                payload=expansion_goal,
+                expectations=[
+                    VerifierExpectation(
+                        metric="owned_bases",
+                        operator=">=",
+                        value=expansion_goal["base_number"],
+                        description=f"secure base {expansion_goal['base_number']}",
                     )
                 ],
                 utterance_id=utterance.utterance_id,
@@ -76,6 +104,8 @@ def parse_utterance(utterance: CommandUtterance) -> list[ParsedCommand]:
                 priority=IntentPriority.PREFERRED,
                 duration="until_changed",
                 strength=max(style.values()),
+                adaptivity=IntentAdaptivity.ADAPTIVE,
+                conflict_policy=ConflictPolicy.REPLACE_SCOPE,
                 payload={"style": style},
                 expectations=[
                     VerifierExpectation(
@@ -98,6 +128,8 @@ def parse_utterance(utterance: CommandUtterance) -> list[ParsedCommand]:
                 priority=IntentPriority.HARD,
                 duration="until_cancelled_or_invalid",
                 strength=0.9,
+                adaptivity=IntentAdaptivity.SAFETY_BREAKABLE,
+                conflict_policy=ConflictPolicy.REPLACE_SCOPE,
                 payload={"plan": plan, "allow_adaptation": True},
                 expectations=[
                     VerifierExpectation(
@@ -120,6 +152,8 @@ def parse_utterance(utterance: CommandUtterance) -> list[ParsedCommand]:
                 scope="army",
                 priority=IntentPriority.URGENT,
                 duration="ttl_frames",
+                adaptivity=IntentAdaptivity.FIXED,
+                conflict_policy=ConflictPolicy.SAFETY_OVERRIDE,
                 payload={"ttl_frames": 720},
                 expectations=[
                     VerifierExpectation(
@@ -141,6 +175,8 @@ def parse_utterance(utterance: CommandUtterance) -> list[ParsedCommand]:
                 scope=doctrine["scope"],
                 priority=IntentPriority.HARD,
                 duration="until_changed",
+                adaptivity=IntentAdaptivity.ADAPTIVE,
+                conflict_policy=ConflictPolicy.REPLACE_SCOPE,
                 payload=doctrine,
                 expectations=[
                     VerifierExpectation(
@@ -161,6 +197,8 @@ def parse_utterance(utterance: CommandUtterance) -> list[ParsedCommand]:
                 action="patch_contract",
                 scope="global",
                 priority=IntentPriority.PREFERRED,
+                adaptivity=IntentAdaptivity.ADAPTIVE,
+                conflict_policy=ConflictPolicy.REPLACE_SCOPE,
                 payload={"preserve_existing": True},
                 utterance_id=utterance.utterance_id,
                 ambiguity_score=0.35,
@@ -202,6 +240,16 @@ def _parse_worker_delta(text: str) -> int | None:
     if any(token in text for token in ["더", "추가", "more", "additional"]):
         return number
     return number
+
+
+def _parse_expansion_goal(text: str) -> dict[str, int | str] | None:
+    if not any(token in text for token in ["멀티", "확장", "third", "expand"]):
+        return None
+    if any(token in text for token in ["3멀티", "삼멀티", "third"]):
+        return {"base_number": 3, "mode": "at_least"}
+    if any(token in text for token in ["앞마당", "natural", "2멀티"]):
+        return {"base_number": 2, "mode": "at_least"}
+    return None
 
 
 def _parse_style(text: str) -> dict[str, float]:
