@@ -9,6 +9,8 @@ class ReplayReport:
     command_fulfillment_rate: float
     intent_adherence_score: float
     safety_override_count: int
+    blocked_count: int
+    conflict_count: int
     degraded_count: int
     details: list[str] = field(default_factory=list)
 
@@ -17,6 +19,8 @@ class ReplayReport:
             "command_fulfillment_rate": self.command_fulfillment_rate,
             "intent_adherence_score": self.intent_adherence_score,
             "safety_override_count": self.safety_override_count,
+            "blocked_count": self.blocked_count,
+            "conflict_count": self.conflict_count,
             "degraded_count": self.degraded_count,
             "details": self.details,
         }
@@ -42,6 +46,14 @@ def build_report(events: list[dict[str, Any]]) -> ReplayReport:
     degraded_count = sum(
         1 for event in command_events if event.get("payload", {}).get("status") == "degraded"
     )
+    blocked_count = sum(
+        1 for event in command_events if event.get("payload", {}).get("status") == "blocked"
+    )
+    conflict_count = sum(
+        1
+        for event in command_events
+        if event.get("payload", {}).get("category") in {"style_conflict", "command_conflict"}
+    )
     denominator = len(active_or_terminal) or 1
     fulfillment_rate = len(fulfilled) / denominator
     adherence = sum(adherence_scores) / len(adherence_scores) if adherence_scores else 0.0
@@ -49,6 +61,8 @@ def build_report(events: list[dict[str, Any]]) -> ReplayReport:
         command_fulfillment_rate=round(fulfillment_rate, 4),
         intent_adherence_score=round(adherence, 4),
         safety_override_count=safety_override_count,
+        blocked_count=blocked_count,
+        conflict_count=conflict_count,
         degraded_count=degraded_count,
         details=[f"command_events={len(command_events)}", f"adherence_samples={len(adherence_scores)}"],
     )

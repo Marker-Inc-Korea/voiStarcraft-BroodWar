@@ -105,18 +105,23 @@ def _apply(text: str, state_path: Path | None = None, telemetry_path: Path | Non
     policy = SafetyPolicy()
     commands = parse_utterance(CommandUtterance(text=text))
     safe_commands = []
+    safety_events = []
     for command in commands:
         decision = policy.evaluate(state, command)
         if decision.status == CommandStatus.ACCEPTED:
             safe_commands.append(command)
         else:
             state.memory.record(command, decision.status, decision.reason)
+            event = command.to_event(decision.status, decision.reason)
+            event["category"] = decision.category
+            event["details"] = decision.details or {}
+            safety_events.append(event)
     result = adapter.apply(state, safe_commands)
     if store:
         store.save(state)
     if telemetry_path:
         telemetry = TelemetryLog(telemetry_path)
-        for event in result.accepted + result.degraded + result.rejected:
+        for event in safety_events + result.accepted + result.degraded + result.rejected:
             telemetry.write("command_status", event)
         telemetry.write("contract_snapshot", adapter.runtime_payload(state))
     arbiter = IntentArbiter()
