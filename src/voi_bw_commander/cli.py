@@ -8,6 +8,7 @@ from .adapters import BotAdapter
 from .audit import audit_source_tree
 from .arbiter import ActionCandidate, IntentArbiter
 from .backends import BACKEND_CANDIDATES, default_manifest
+from .eval import evaluate_corpus
 from .llm import StrictLLMCommandParser
 from .models import CommandStatus, CommandUtterance, IntentState
 from .parser import parse_utterance
@@ -60,6 +61,9 @@ def main(argv: list[str] | None = None) -> int:
     ready_cmd = sub.add_parser("readiness", help="Check repository-side production readiness assets.")
     ready_cmd.add_argument("--root", type=Path, default=Path.cwd())
 
+    eval_cmd = sub.add_parser("eval-corpus", help="Evaluate parser against a golden command corpus.")
+    eval_cmd.add_argument("corpus", type=Path)
+
     args = parser.parse_args(argv)
     if args.command == "parse":
         return _parse(args.text, args.queue)
@@ -79,6 +83,8 @@ def main(argv: list[str] | None = None) -> int:
         return _match_plan(args.bot, args.opponent, args.race, args.map_name, args.queue, args.telemetry)
     if args.command == "readiness":
         return _readiness(args.root)
+    if args.command == "eval-corpus":
+        return _eval_corpus(args.corpus)
     raise AssertionError("unreachable")
 
 
@@ -204,6 +210,12 @@ def _readiness(root: Path) -> int:
     report = check_runtime(root)
     print(json.dumps(report.to_dict(), ensure_ascii=False, indent=2, sort_keys=True))
     return 0
+
+
+def _eval_corpus(corpus: Path) -> int:
+    report = evaluate_corpus(corpus)
+    print(json.dumps(report.to_dict(), ensure_ascii=False, indent=2, sort_keys=True))
+    return 0 if report.passed else 1
 
 
 if __name__ == "__main__":
