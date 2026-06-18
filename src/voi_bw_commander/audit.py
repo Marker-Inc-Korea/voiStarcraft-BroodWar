@@ -30,6 +30,45 @@ class AuditReport:
         }
 
 
+@dataclass(frozen=True)
+class CommandabilityDecision:
+    backend: str
+    role: str
+    integration_level: int
+    primary_candidate: bool
+    rationale: str
+    forbidden_integration_modes: tuple[str, ...] = ("external_unit_control",)
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "backend": self.backend,
+            "role": self.role,
+            "integration_level": self.integration_level,
+            "primary_candidate": self.primary_candidate,
+            "rationale": self.rationale,
+            "forbidden_integration_modes": list(self.forbidden_integration_modes),
+        }
+
+
+def decide_commandability(report: AuditReport) -> CommandabilityDecision:
+    if report.promotable:
+        return CommandabilityDecision(
+            backend=report.backend,
+            role="commandable_backend",
+            integration_level=3,
+            primary_candidate=True,
+            rationale="source tree exposes build, strategy, production, squad, runtime input, and telemetry indicators",
+        )
+    missing = [finding.area for finding in report.findings if not finding.passed]
+    return CommandabilityDecision(
+        backend=report.backend,
+        role="benchmark_only",
+        integration_level=0,
+        primary_candidate=False,
+        rationale=f"missing source-level command hooks: {', '.join(missing)}",
+    )
+
+
 def audit_source_tree(backend: str, root: Path) -> AuditReport:
     files = [path for path in root.rglob("*") if path.is_file()] if root.exists() else []
     names = " ".join(path.name.lower() for path in files)

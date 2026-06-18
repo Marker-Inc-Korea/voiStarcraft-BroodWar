@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 
 from .adapters import BotAdapter
-from .audit import audit_source_tree
+from .audit import audit_source_tree, decide_commandability
 from .arbiter import ActionCandidate, IntentArbiter
 from .backends import BACKEND_CANDIDATES, default_manifest
 from .benchmark import build_regression_suite
@@ -216,7 +216,14 @@ def _compare_report(baseline_path: Path, commanded_path: Path) -> int:
 
 def _audit_source(backend: str, path: Path) -> int:
     report = audit_source_tree(backend, path)
-    print(json.dumps(report.to_dict(), ensure_ascii=False, indent=2, sort_keys=True))
+    print(
+        json.dumps(
+            {"audit": report.to_dict(), "decision": decide_commandability(report).to_dict()},
+            ensure_ascii=False,
+            indent=2,
+            sort_keys=True,
+        )
+    )
     return 0
 
 
