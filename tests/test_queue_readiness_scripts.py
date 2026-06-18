@@ -106,3 +106,56 @@ def test_cli_benchmark_plan_includes_regression_outputs(tmp_path) -> None:
     assert "commanded_plan" in result.stdout
     assert "compare-report JSON" in result.stdout
     assert "desync marker" in result.stdout
+
+
+def test_cli_vertical_slice_from_language_to_report(tmp_path) -> None:
+    queue = tmp_path / "commands.jsonl"
+    state = tmp_path / "state.json"
+    telemetry = tmp_path / "telemetry.jsonl"
+    env = {**os.environ, "PYTHONPATH": "src"}
+
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "voi_bw_commander.cli",
+            "parse",
+            "저그 드론 5개 더 2햇 뮤탈 견제 일꾼만",
+            "--queue",
+            str(queue),
+        ],
+        check=True,
+        capture_output=True,
+        env=env,
+        text=True,
+    )
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "voi_bw_commander.cli",
+            "apply",
+            "저그 드론 5개 더 2햇 뮤탈 견제 일꾼만",
+            "--state",
+            str(state),
+            "--telemetry",
+            str(telemetry),
+        ],
+        check=True,
+        capture_output=True,
+        env=env,
+        text=True,
+    )
+    report = subprocess.run(
+        [sys.executable, "-m", "voi_bw_commander.cli", "report", str(telemetry)],
+        check=True,
+        capture_output=True,
+        env=env,
+        text=True,
+    )
+
+    assert queue.exists()
+    assert state.exists()
+    assert telemetry.exists()
+    assert "command_fulfillment_rate" in report.stdout
+    assert "degraded_count" in report.stdout
