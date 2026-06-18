@@ -2,7 +2,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .models import Race
+from .models import CommandType, ParsedCommand, Race
+
+
+@dataclass(frozen=True)
+class RaceCommandResolution:
+    valid: bool
+    reason: str
+    resolved_payload: dict[str, object]
 
 
 @dataclass(frozen=True)
@@ -27,6 +34,25 @@ class RaceProfile:
             "anti_air": self.anti_air,
             "spell_priority": self.spell_priority,
         }.get(role, ())
+
+    def resolve_command(self, command: ParsedCommand) -> RaceCommandResolution:
+        payload = dict(command.payload)
+        if command.action == "produce_worker":
+            payload["unit_type"] = self.worker
+            return RaceCommandResolution(True, "resolved worker goal", payload)
+        if command.action == "take_expansion":
+            payload["race"] = self.race.value
+            return RaceCommandResolution(True, "resolved expansion goal", payload)
+        if command.command_type == CommandType.STRATEGIC_COMMITMENT:
+            plan = str(payload.get("plan", ""))
+            if plan not in self.strategic_aliases:
+                return RaceCommandResolution(False, f"{plan} is not legal for {self.race.value}", payload)
+            payload["required_tech"] = list(self.strategic_aliases[plan])
+            return RaceCommandResolution(True, "resolved strategic commitment", payload)
+        if command.command_type == CommandType.MICRO_DOCTRINE:
+            payload["race_harass_units"] = list(self.harass)
+            return RaceCommandResolution(True, "resolved micro doctrine", payload)
+        return RaceCommandResolution(True, "race-neutral command", payload)
 
 
 PROFILES: dict[Race, RaceProfile] = {
