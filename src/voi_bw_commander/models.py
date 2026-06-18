@@ -289,6 +289,15 @@ class StrategicContract:
         elif command.command_type == CommandType.CONTRACT_PATCH:
             self._apply_patch(command.payload)
 
+    def remove_command(self, command_id: str) -> None:
+        for bucket in (
+            self.strategic_commitments,
+            self.hard_goals,
+            self.standing_orders,
+            self.instant_orders,
+        ):
+            bucket.pop(command_id, None)
+
     def _apply_patch(self, payload: dict[str, Any]) -> None:
         if race := payload.get("race"):
             self.race = Race(race)
@@ -347,6 +356,11 @@ class IntentState:
         command: ParsedCommand,
         manifest: CapabilityManifest | None = None,
     ) -> CommandStatus:
+        if command.action == "cancel_intent":
+            cancelled = self.cancel_matching(command.payload)
+            self.memory.record(command, CommandStatus.FULFILLED, f"cancelled={cancelled}")
+            self.version += 1
+            return CommandStatus.FULFILLED
         if manifest is not None:
             supported, reason = manifest.supports(self.contract.race, command)
             if not supported:
@@ -356,6 +370,22 @@ class IntentState:
         self.memory.record(command, CommandStatus.ACTIVE)
         self.version += 1
         return CommandStatus.ACTIVE
+
+    def cancel_matching(self, criteria: dict[str, Any]) -> int:
+        target_action = criteria.get("target_action")
+        target_plan = criteria.get("target_plan")
+        cancel_all = criteria.get("all", False)
+        cancelled = 0
+        for command_id, active_command in list(self.memory.active.items()):
+            if not cancel_all:
+                if target_action and active_command.action != target_action:
+                    continue
+                if target_plan and active_command.payload.get("plan") != target_plan:
+                    continue
+            self.contract.remove_command(command_id)
+            self.memory.record(active_command, CommandStatus.CANCELLED, "cancelled by user command")
+            cancelled += 1
+        return cancelled
 
     def telemetry_snapshot(self) -> dict[str, Any]:
         return {

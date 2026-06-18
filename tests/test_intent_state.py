@@ -76,3 +76,17 @@ def test_intent_metadata_survives_state_round_trip() -> None:
 
     assert command.adaptivity == IntentAdaptivity.FIXED
     assert command.conflict_policy == ConflictPolicy.SAFETY_OVERRIDE
+
+
+def test_cancel_command_removes_matching_active_intent() -> None:
+    state = IntentState()
+    adapter = BotAdapter(default_manifest())
+    adapter.apply(state, parse_utterance(CommandUtterance(text="저그 2햇 뮤탈")))
+
+    assert state.contract.strategic_commitments
+
+    result = adapter.apply(state, parse_utterance(CommandUtterance(text="2햇 뮤탈 취소해")))
+
+    assert result.accepted[0]["status"] == "fulfilled"
+    assert not state.contract.strategic_commitments
+    assert state.memory.cancelled
