@@ -23,6 +23,9 @@ class RaceProfile:
     anti_air: tuple[str, ...]
     spell_priority: tuple[str, ...]
     strategic_aliases: dict[str, tuple[str, ...]]
+    unit_aliases: dict[str, str]
+    structure_aliases: dict[str, str]
+    upgrade_aliases: dict[str, str]
 
     def resolve_unit_role(self, role: str) -> tuple[str, ...]:
         return {
@@ -40,6 +43,24 @@ class RaceProfile:
         if command.action == "produce_worker":
             payload["unit_type"] = self.worker
             return RaceCommandResolution(True, "resolved worker goal", payload)
+        if command.action == "produce_unit":
+            alias = str(payload.get("unit", ""))
+            if alias not in self.unit_aliases:
+                return RaceCommandResolution(False, f"{alias} is not legal for {self.race.value}", payload)
+            payload["unit_type"] = self.unit_aliases[alias]
+            return RaceCommandResolution(True, "resolved unit production goal", payload)
+        if command.action == "build_structure":
+            alias = str(payload.get("structure", ""))
+            if alias not in self.structure_aliases:
+                return RaceCommandResolution(False, f"{alias} is not legal for {self.race.value}", payload)
+            payload["structure_type"] = self.structure_aliases[alias]
+            return RaceCommandResolution(True, "resolved structure goal", payload)
+        if command.action == "research_upgrade":
+            alias = str(payload.get("upgrade", ""))
+            if alias not in self.upgrade_aliases:
+                return RaceCommandResolution(False, f"{alias} is not legal for {self.race.value}", payload)
+            payload["upgrade_type"] = self.upgrade_aliases[alias]
+            return RaceCommandResolution(True, "resolved upgrade goal", payload)
         if command.action == "take_expansion":
             payload["race"] = self.race.value
             return RaceCommandResolution(True, "resolved expansion goal", payload)
@@ -69,6 +90,18 @@ PROFILES: dict[Race, RaceProfile] = {
             "two_hatch_muta": ("Spawning Pool", "Lair", "Spire", "Mutalisk"),
             "lurker_contain": ("Hydralisk Den", "Lurker Aspect", "Lurker"),
         },
+        unit_aliases={
+            "mutalisk": "Mutalisk",
+            "zergling": "Zergling",
+        },
+        structure_aliases={
+            "spire": "Spire",
+            "sunken_colony": "Sunken Colony",
+        },
+        upgrade_aliases={
+            "zergling_speed": "Metabolic Boost",
+            "lurker_aspect": "Lurker Aspect",
+        },
     ),
     Race.PROTOSS: RaceProfile(
         race=Race.PROTOSS,
@@ -83,6 +116,18 @@ PROFILES: dict[Race, RaceProfile] = {
             "two_gate_pressure": ("Gateway", "Cybernetics Core", "Dragoon Range"),
             "reaver_harass": ("Robotics Facility", "Shuttle", "Reaver"),
         },
+        unit_aliases={
+            "dragoon": "Dragoon",
+            "reaver": "Reaver",
+        },
+        structure_aliases={
+            "gateway": "Gateway",
+            "robotics_facility": "Robotics Facility",
+            "photon_cannon": "Photon Cannon",
+        },
+        upgrade_aliases={
+            "dragoon_range": "Singularity Charge",
+        },
     ),
     Race.TERRAN: RaceProfile(
         race=Race.TERRAN,
@@ -96,6 +141,19 @@ PROFILES: dict[Race, RaceProfile] = {
         strategic_aliases={
             "vulture_harass": ("Factory", "Vulture", "Spider Mines"),
             "tank_contain": ("Factory", "Machine Shop", "Siege Mode", "Siege Tank"),
+        },
+        unit_aliases={
+            "vulture": "Vulture",
+            "siege_tank": "Siege Tank",
+            "marine": "Marine",
+        },
+        structure_aliases={
+            "factory": "Factory",
+            "missile_turret": "Missile Turret",
+        },
+        upgrade_aliases={
+            "siege_mode": "Siege Mode",
+            "spider_mines": "Spider Mines",
         },
     ),
 }

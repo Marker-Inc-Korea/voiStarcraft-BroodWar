@@ -10,14 +10,18 @@ from .arbiter import ActionCandidate, IntentArbiter
 from .backends import BACKEND_CANDIDATES, EXCLUDED_PLAYABLE_BACKENDS, default_manifest
 from .benchmark import build_regression_suite
 from .eval import evaluate_corpus
-from .llm import StrictLLMCommandParser
+from .input_surfaces import ingest_transcript, ingest_transcript_file, write_commander_ui
+from .llm import LLMProviderConfig, OpenAICompatibleCommandParser, StrictLLMCommandParser
 from .models import CommandStatus, CommandUtterance, IntentState
 from .parser import parse_utterance
 from .queue import CommandQueue, command_to_dict
 from .readiness import check_runtime
+from .replay_ingest import ingest_replay_metrics, write_ingested_events
 from .replay_report import build_report, compare_reports
 from .runner import MatchSpec
 from .safety import SafetyPolicy
+from .source_hooks import HOOK_PLANS, get_hook_plan, write_hook_plan
+from .stardata import extract_trajectory_features, write_feature_jsonl
 from .store import StateStore
 from .telemetry import TelemetryLog
 from .verifier import Verifier
@@ -43,6 +47,9 @@ def main(argv: list[str] | None = None) -> int:
 
     llm_cmd = sub.add_parser("parse-llm-json", help="Validate strict LLM JSON output.")
     llm_cmd.add_argument("json_text")
+
+    llm_live_cmd = sub.add_parser("parse-llm-live", help="Parse text through an OpenAI-compatible LLM provider.")
+    llm_live_cmd.add_argument("text")
 
     report_cmd = sub.add_parser("report", help="Build a report from telemetry JSONL.")
     report_cmd.add_argument("telemetry", type=Path)
@@ -76,6 +83,28 @@ def main(argv: list[str] | None = None) -> int:
     eval_cmd = sub.add_parser("eval-corpus", help="Evaluate parser against a golden command corpus.")
     eval_cmd.add_argument("corpus", type=Path)
 
+    hook_cmd = sub.add_parser("hook-plan", help="Print or write source-level hook plans for backend bots.")
+    hook_cmd.add_argument("--backend", choices=sorted(HOOK_PLANS), action="append")
+    hook_cmd.add_argument("--output-dir", type=Path)
+
+    replay_cmd = sub.add_parser("replay-ingest", help="Normalize replay-derived JSON/JSONL/CSV metrics into telemetry JSONL.")
+    replay_cmd.add_argument("input", type=Path)
+    replay_cmd.add_argument("--output", type=Path)
+
+    transcript_cmd = sub.add_parser("transcript", help="Parse a voice/text transcript and append commands to a queue.")
+    transcript_source = transcript_cmd.add_mutually_exclusive_group(required=True)
+    transcript_source.add_argument("--text")
+    transcript_source.add_argument("--file", type=Path)
+    transcript_cmd.add_argument("--queue", required=True, type=Path)
+
+    ui_cmd = sub.add_parser("write-ui", help="Write the static commander UI handoff page.")
+    ui_cmd.add_argument("--output", required=True, type=Path)
+    ui_cmd.add_argument("--queue", required=True, type=Path)
+
+    stardata_cmd = sub.add_parser("stardata-features", help="Extract V3 intent representation features from trajectory rows.")
+    stardata_cmd.add_argument("input", type=Path)
+    stardata_cmd.add_argument("--output", type=Path)
+
     args = parser.parse_args(argv)
     if args.command == "parse":
         return _parse(args.text, args.queue)
@@ -87,6 +116,8 @@ def main(argv: list[str] | None = None) -> int:
         return _verify_demo(args.text)
     if args.command == "parse-llm-json":
         return _parse_llm_json(args.json_text)
+    if args.command == "parse-llm-live":
+        return _parse_llm_live(args.text)
     if args.command == "report":
         return _report(args.telemetry)
     if args.command == "compare-report":
@@ -101,6 +132,16 @@ def main(argv: list[str] | None = None) -> int:
         return _readiness(args.root)
     if args.command == "eval-corpus":
         return _eval_corpus(args.corpus)
+    if args.command == "hook-plan":
+        return _hook_plan(tuple(args.backend or sorted(HOOK_PLANS)), args.output_dir)
+    if args.command == "replay-ingest":
+        return _replay_ingest(args.input, args.output)
+    if args.command == "transcript":
+        return _transcript(args.text, args.file, args.queue)
+    if args.command == "write-ui":
+        return _write_ui(args.output, args.queue)
+    if args.command == "stardata-features":
+        return _stardata_features(args.input, args.output)
     raise AssertionError("unreachable")
 
 
@@ -212,6 +253,12 @@ def _parse_llm_json(json_text: str) -> int:
     return 0
 
 
+def _parse_llm_live(text: str) -> int:
+    commands = OpenAICompatibleCommandParser(LLMProviderConfig.from_env()).parse_text(text)
+    print(json.dumps([command_to_dict(command) for command in commands], ensure_ascii=False, indent=2, sort_keys=True))
+    return 0
+
+
 def _report(telemetry_path: Path) -> int:
     report = build_report(TelemetryLog(telemetry_path).read())
     print(json.dumps(report.to_dict(), ensure_ascii=False, indent=2, sort_keys=True))
@@ -266,6 +313,57 @@ def _eval_corpus(corpus: Path) -> int:
     report = evaluate_corpus(corpus)
     print(json.dumps(report.to_dict(), ensure_ascii=False, indent=2, sort_keys=True))
     return 0 if report.passed else 1
+
+
+def _hook_plan(backends: tuple[str, ...], output_dir: Path | None) -> int:
+    if output_dir:
+        paths = [str(write_hook_plan(backend, output_dir)) for backend in backends]
+        print(json.dumps({"written": paths}, ensure_ascii=False, indent=2, sort_keys=True))
+    else:
+        print(
+            json.dumps(
+                {"plans": [get_hook_plan(backend).to_dict() for backend in backends]},
+                ensure_ascii=False,
+                indent=2,
+                sort_keys=True,
+            )
+        )
+    return 0
+
+
+def _replay_ingest(input_path: Path, output: Path | None) -> int:
+    result = ingest_replay_metrics(input_path)
+    if output:
+        write_ingested_events(result, output)
+    print(json.dumps(result.to_dict(), ensure_ascii=False, indent=2, sort_keys=True))
+    return 0
+
+
+def _transcript(text: str | None, file: Path | None, queue: Path) -> int:
+    result = ingest_transcript_file(file, queue) if file else ingest_transcript(text or "", queue)
+    print(json.dumps(result.to_dict(), ensure_ascii=False, indent=2, sort_keys=True))
+    return 0
+
+
+def _write_ui(output: Path, queue: Path) -> int:
+    path = write_commander_ui(output, queue)
+    print(json.dumps({"ui": str(path), "queue": str(queue)}, ensure_ascii=False, indent=2, sort_keys=True))
+    return 0
+
+
+def _stardata_features(input_path: Path, output: Path | None) -> int:
+    features = extract_trajectory_features(input_path)
+    if output:
+        write_feature_jsonl(features, output)
+    print(
+        json.dumps(
+            {"feature_count": len(features), "features": [feature.to_dict() for feature in features]},
+            ensure_ascii=False,
+            indent=2,
+            sort_keys=True,
+        )
+    )
+    return 0
 
 
 if __name__ == "__main__":

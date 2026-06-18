@@ -34,6 +34,11 @@ def check_runtime(root: Path) -> ReadinessReport:
         _exists("parser corpus", root / "fixtures" / "parser_corpus.json"),
         _exists("CI workflow", root / ".github" / "workflows" / "ci.yml"),
         _exists("issue completion matrix", root / "docs" / "ISSUE_COMPLETION_MATRIX.md"),
+        _exists("source hook plans", root / "src" / "voi_bw_commander" / "source_hooks.py"),
+        _exists("replay metric ingestion", root / "src" / "voi_bw_commander" / "replay_ingest.py"),
+        _exists("input surfaces", root / "src" / "voi_bw_commander" / "input_surfaces.py"),
+        _exists("StarData representation", root / "src" / "voi_bw_commander" / "stardata.py"),
+        _exists("commander UI template", root / "ui" / "commander.html"),
     )
     return ReadinessReport(checks)
 
