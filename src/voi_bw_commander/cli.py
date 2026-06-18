@@ -8,6 +8,7 @@ from .adapters import BotAdapter
 from .audit import audit_source_tree
 from .arbiter import ActionCandidate, IntentArbiter
 from .backends import BACKEND_CANDIDATES, default_manifest
+from .benchmark import build_regression_suite
 from .eval import evaluate_corpus
 from .llm import StrictLLMCommandParser
 from .models import CommandStatus, CommandUtterance, IntentState
@@ -62,6 +63,13 @@ def main(argv: list[str] | None = None) -> int:
     plan_cmd.add_argument("--queue", required=True, type=Path)
     plan_cmd.add_argument("--telemetry", required=True, type=Path)
 
+    bench_cmd = sub.add_parser("benchmark-plan", help="Print commanded-vs-baseline benchmark regression plans.")
+    bench_cmd.add_argument("--bot", required=True)
+    bench_cmd.add_argument("--race", required=True)
+    bench_cmd.add_argument("--map", required=True, dest="map_name")
+    bench_cmd.add_argument("--root", required=True, type=Path)
+    bench_cmd.add_argument("--opponent", action="append", dest="opponents")
+
     ready_cmd = sub.add_parser("readiness", help="Check repository-side production readiness assets.")
     ready_cmd.add_argument("--root", type=Path, default=Path.cwd())
 
@@ -87,6 +95,8 @@ def main(argv: list[str] | None = None) -> int:
         return _audit_source(args.backend, args.path)
     if args.command == "match-plan":
         return _match_plan(args.bot, args.opponent, args.race, args.map_name, args.queue, args.telemetry)
+    if args.command == "benchmark-plan":
+        return _benchmark_plan(args.bot, args.race, args.map_name, args.root, tuple(args.opponents or ()))
     if args.command == "readiness":
         return _readiness(args.root)
     if args.command == "eval-corpus":
@@ -220,6 +230,12 @@ def _match_plan(
 ) -> int:
     spec = MatchSpec(bot=bot, opponent=opponent, race=race, map_name=map_name, command_queue=queue, telemetry_log=telemetry)
     print(json.dumps({"plan": spec.to_command_plan()}, ensure_ascii=False, indent=2))
+    return 0
+
+
+def _benchmark_plan(bot: str, race: str, map_name: str, root: Path, opponents: tuple[str, ...]) -> int:
+    suite = build_regression_suite(bot, race, map_name, root, opponents or ("PurpleWave", "Steamhammer"))
+    print(json.dumps({"cases": [case.to_dict() for case in suite]}, ensure_ascii=False, indent=2, sort_keys=True))
     return 0
 
 
