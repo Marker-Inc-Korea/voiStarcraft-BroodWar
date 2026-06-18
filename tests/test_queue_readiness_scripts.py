@@ -6,6 +6,7 @@ from voi_bw_commander.models import CommandUtterance
 from voi_bw_commander.parser import parse_utterance
 from voi_bw_commander.queue import CommandQueue
 from voi_bw_commander.readiness import check_runtime
+from voi_bw_commander.store import StateStore
 
 
 def test_queue_round_trips_parsed_commands(tmp_path) -> None:
@@ -22,6 +23,23 @@ def test_repository_readiness_passes() -> None:
     report = check_runtime(__import__("pathlib").Path.cwd())
 
     assert report.ready
+
+
+def test_state_store_replays_persisted_contract(tmp_path) -> None:
+    from voi_bw_commander.adapters import BotAdapter
+    from voi_bw_commander.backends import default_manifest
+    from voi_bw_commander.models import IntentState
+
+    store = StateStore(tmp_path / "state.json")
+    state = IntentState()
+    BotAdapter(default_manifest()).apply(state, parse_utterance(CommandUtterance(text="저그 드론 5개 더")))
+    store.save(state)
+
+    replayed = store.load()
+
+    assert replayed.contract.race.value == "Zerg"
+    assert replayed.contract.hard_goals
+    assert replayed.memory.active
 
 
 def test_purplewave_patch_script_dry_run() -> None:

@@ -36,6 +36,30 @@ def parse_utterance(utterance: CommandUtterance) -> list[ParsedCommand]:
     lower = text.lower()
     commands: list[ParsedCommand] = []
 
+    cancel = _parse_cancel(lower)
+    if cancel:
+        return [
+            ParsedCommand(
+                command_type=CommandType.CONTRACT_PATCH,
+                action="cancel_intent",
+                scope="global",
+                priority=IntentPriority.HARD,
+                duration="instant",
+                adaptivity=IntentAdaptivity.FIXED,
+                conflict_policy=ConflictPolicy.REPLACE_SCOPE,
+                payload=cancel,
+                expectations=[
+                    VerifierExpectation(
+                        metric="cancelled_command_count",
+                        operator=">=",
+                        value=1,
+                        description="matching active intent is cancelled",
+                    )
+                ],
+                utterance_id=utterance.utterance_id,
+            )
+        ]
+
     if race := _parse_race(lower):
         commands.append(
             ParsedCommand(
@@ -250,6 +274,19 @@ def _parse_expansion_goal(text: str) -> dict[str, int | str] | None:
     if any(token in text for token in ["앞마당", "natural", "2멀티"]):
         return {"base_number": 2, "mode": "at_least"}
     return None
+
+
+def _parse_cancel(text: str) -> dict[str, object] | None:
+    if not any(token in text for token in ["취소", "그만", "cancel", "stop"]):
+        return None
+    plans = _parse_strategic_commitments(text)
+    if plans:
+        return {"target_action": "commit_strategy", "target_plan": plans[0]}
+    if any(token in text for token in ["공격", "attack"]):
+        return {"target_action": "attack"}
+    if any(token in text for token in ["견제", "micro", "doctrine"]):
+        return {"target_action": "set_micro_doctrine"}
+    return {"all": True}
 
 
 def _parse_style(text: str) -> dict[str, float]:

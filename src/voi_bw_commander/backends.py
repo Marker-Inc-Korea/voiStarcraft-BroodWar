@@ -95,6 +95,7 @@ def default_manifest(name: str = "SteamhammerVerticalSlice") -> CapabilityManife
             "attack",
             "retreat",
             "patch_contract",
+            "cancel_intent",
         },
         integration_level=4,
         notes="Local production contract manifest. Real bot hooks require commandability audit and source patch.",

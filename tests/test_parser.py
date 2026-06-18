@@ -37,3 +37,11 @@ def test_parse_contract_patch_with_expansion_goal() -> None:
     assert expansion.payload["base_number"] == 3
     assert expansion.expectations[0].metric == "owned_bases"
     assert patch.payload["preserve_existing"] is True
+
+
+def test_parse_cancel_strategy_command() -> None:
+    [command] = parse_utterance(CommandUtterance(text="2햇 뮤탈 취소해"))
+
+    assert command.action == "cancel_intent"
+    assert command.payload == {"target_action": "commit_strategy", "target_plan": "two_hatch_muta"}
+    assert command.expectations[0].metric == "cancelled_command_count"
