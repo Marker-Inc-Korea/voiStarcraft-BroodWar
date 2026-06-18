@@ -1,0 +1,38 @@
+[
+  {
+    "id": "ko_zerg_canonical",
+    "text": "저그로 해. 드론 5개 더 찍고 2햇 뮤탈. 침략적으로 가되 정면 싸움은 피하고 일꾼만 흔들어.",
+    "expected_actions": ["set_race", "produce_worker", "set_style", "commit_strategy", "set_micro_doctrine"],
+    "expected_plans": ["two_hatch_muta"],
+    "expected_race": "Zerg",
+    "min_commands": 5,
+    "max_ambiguity": 0.35
+  },
+  {
+    "id": "en_terran_vulture_harass",
+    "text": "Terran. Make 5 more SCVs, play aggressive, keep harassing workers with vultures and avoid the main army.",
+    "expected_actions": ["set_race", "produce_worker", "set_style", "commit_strategy", "set_micro_doctrine"],
+    "expected_plans": ["vulture_harass"],
+    "expected_race": "Terran",
+    "min_commands": 5,
+    "max_ambiguity": 0.0
+  },
+  {
+    "id": "ko_protoss_reaver_harass",
+    "text": "프로토스로 리버 견제 중심으로 가고 프로브 5개 더 찍어. 정면 싸움은 피하고 일꾼만 때려.",
+    "expected_actions": ["set_race", "produce_worker", "set_style", "commit_strategy", "set_micro_doctrine"],
+    "expected_plans": ["reaver_harass"],
+    "expected_race": "Protoss",
+    "min_commands": 5,
+    "max_ambiguity": 0.0
+  },
+  {
+    "id": "ambiguous_style_only",
+    "text": "뭔가 멋지게 해봐",
+    "expected_actions": ["unparsed"],
+    "expected_plans": [],
+    "expected_race": null,
+    "min_commands": 1,
+    "max_ambiguity": 1.0
+  }
+]

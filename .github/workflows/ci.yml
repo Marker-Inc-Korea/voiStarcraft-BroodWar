@@ -12,5 +12,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.10"
+      - run: python -m pip install -e . pytest
       - run: python -m pytest
       - run: PYTHONPATH=src python -m voi_bw_commander.cli verify-demo "저그 드론 5개 더 2햇 뮤탈 견제 일꾼만"

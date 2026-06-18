@@ -20,6 +20,13 @@ def main() -> int:
     lifecycle = root / "src" / "Lifecycle" / "PurpleWave.scala"
     target_dir = root / "src" / "Commander"
 
+    if not lifecycle.exists() and args.dry_run:
+        print(f"target={root}")
+        print(f"copy Commander templates -> {target_dir}")
+        print(f"patch lifecycle -> {lifecycle}")
+        print("dry_run_missing_lifecycle=true")
+        print("patch lifecycle requires a full PurpleWave checkout before applying")
+        return 0
     if not lifecycle.exists():
         raise SystemExit(f"missing PurpleWave lifecycle file: {lifecycle}")
 

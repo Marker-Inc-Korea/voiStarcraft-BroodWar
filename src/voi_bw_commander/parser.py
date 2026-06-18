@@ -226,7 +226,7 @@ def _parse_strategic_commitments(text: str) -> list[str]:
         "lurker_contain": ["럴커 조이기", "lurker contain"],
         "two_gate_pressure": ["2게이트", "투게이트", "two gate", "two-gate"],
         "reaver_harass": ["리버 견제", "reaver harass"],
-        "vulture_harass": ["벌처 견제", "vulture harass"],
+        "vulture_harass": ["벌처 견제", "vulture harass", "vultures"],
         "tank_contain": ["탱크 조이기", "tank contain"],
     }
     for plan, tokens in patterns.items():
@@ -280,7 +280,7 @@ def _parse_micro_doctrines(text: str) -> list[dict[str, object]]:
 
 
 def _looks_like_patch(text: str) -> bool:
-    return any(token in text for token in ["유지하되", "아까", "keep", "but now", "except"])
+    return any(token in text for token in ["유지하되", "아까", "keep existing", "keep previous", "but now", "except"])
 
 
 def _first_number(text: str) -> int | None:
