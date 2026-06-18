@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>VOI Brood War Commander</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #10130f;
+      --panel: #1d2518;
+      --ink: #f3f1df;
+      --muted: #b8bd9f;
+      --accent: #d7ff64;
+      --line: #465235;
+    }
+    body {
+      margin: 0;
+      font-family: Avenir Next, Optima, Trebuchet MS, sans-serif;
+      background: radial-gradient(circle at top left, #384423, transparent 34rem), linear-gradient(135deg, #10130f, #222617);
+      color: var(--ink);
+    }
+    main {
+      max-width: 880px;
+      margin: 0 auto;
+      padding: 48px 20px;
+    }
+    section {
+      background: #1d2518;
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      padding: 28px;
+      box-shadow: 0 20px 80px rgb(0 0 0 / 35%);
+    }
+    h1 {
+      font-size: clamp(2.2rem, 6vw, 4.4rem);
+      line-height: .92;
+      margin: 0 0 18px;
+      letter-spacing: -0.07em;
+    }
+    textarea {
+      width: 100%;
+      min-height: 128px;
+      box-sizing: border-box;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: #0e120c;
+      color: var(--ink);
+      padding: 16px;
+      font: inherit;
+    }
+    button {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #28331b;
+      color: var(--ink);
+      padding: 10px 14px;
+      margin: 6px 6px 0 0;
+      cursor: pointer;
+    }
+    button.primary {
+      background: var(--accent);
+      color: #171a10;
+      font-weight: 800;
+    }
+    .muted {
+      color: var(--muted);
+    }
+    pre {
+      overflow: auto;
+      background: #0b0e09;
+      border-radius: 16px;
+      padding: 16px;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section>
+      <p class="muted">Queue target: <code>runtime/commands.jsonl</code></p>
+      <h1>Intent Commander</h1>
+      <p>텍스트나 음성 transcript를 commander queue로 넘기고, 봇 소스의 onFrame hook이 cursor 기반으로 읽는 운영 handoff 화면입니다.</p>
+      <textarea id="command">저그 드론 5개 더 찍고 2햇 뮤탈. 침략적으로 가되 정면 싸움은 피하고 일꾼만 흔들어.</textarea>
+      <p><button class="primary" id="download">JSONL로 내보내기</button></p>
+      <button type="button" data-example="프로토스 2게이트 압박. 드라군 사업 먼저.">프로토스 2게이트 압박</button>
+      <button type="button" data-example="테란 벌처 3기 생산하고 마인업. 정면 싸움은 피하고 견제해.">테란 벌처 견제</button>
+      <h2>운영 연결</h2>
+      <pre>PYTHONPATH=src python3 -m voi_bw_commander.cli transcript --text "..." --queue runtime/commands.jsonl</pre>
+    </section>
+  </main>
+  <script>
+    const text = document.querySelector("#command");
+    document.querySelectorAll("[data-example]").forEach(button => {
+      button.addEventListener("click", () => text.value = button.dataset.example);
+    });
+    document.querySelector("#download").addEventListener("click", () => {
+      const blob = new Blob([JSON.stringify({source: "commander_ui", text: text.value}) + "\n"], {type: "application/jsonl"});
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = "commander-input.jsonl";
+      link.click();
+      URL.revokeObjectURL(link.href);
+    });
+  </script>
+</body>
+</html>

@@ -118,6 +118,75 @@ def parse_utterance(utterance: CommandUtterance) -> list[ParsedCommand]:
             )
         )
 
+    for structure_goal in _parse_structure_goals(lower):
+        commands.append(
+            ParsedCommand(
+                command_type=CommandType.HARD_GOAL,
+                action="build_structure",
+                scope="production",
+                priority=IntentPriority.HARD,
+                duration="until_fulfilled_or_invalid",
+                adaptivity=IntentAdaptivity.SAFETY_BREAKABLE,
+                conflict_policy=ConflictPolicy.SUPPRESS_LOWER_PRIORITY,
+                payload=structure_goal,
+                expectations=[
+                    VerifierExpectation(
+                        metric=f"built_{structure_goal['structure']}",
+                        operator=">=",
+                        value=structure_goal.get("count", 1),
+                        description=f"build {structure_goal['structure']}",
+                    )
+                ],
+                utterance_id=utterance.utterance_id,
+            )
+        )
+
+    for upgrade_goal in _parse_upgrade_goals(lower):
+        commands.append(
+            ParsedCommand(
+                command_type=CommandType.HARD_GOAL,
+                action="research_upgrade",
+                scope="tech",
+                priority=IntentPriority.HARD,
+                duration="until_fulfilled_or_invalid",
+                adaptivity=IntentAdaptivity.SAFETY_BREAKABLE,
+                conflict_policy=ConflictPolicy.SUPPRESS_LOWER_PRIORITY,
+                payload=upgrade_goal,
+                expectations=[
+                    VerifierExpectation(
+                        metric="completed_upgrades",
+                        operator="contains",
+                        value=upgrade_goal["upgrade"],
+                        description=f"complete {upgrade_goal['upgrade']}",
+                    )
+                ],
+                utterance_id=utterance.utterance_id,
+            )
+        )
+
+    for unit_goal in _parse_unit_goals(lower):
+        commands.append(
+            ParsedCommand(
+                command_type=CommandType.HARD_GOAL,
+                action="produce_unit",
+                scope="production",
+                priority=IntentPriority.HARD,
+                duration="until_fulfilled_or_invalid",
+                adaptivity=IntentAdaptivity.SAFETY_BREAKABLE,
+                conflict_policy=ConflictPolicy.SUPPRESS_LOWER_PRIORITY,
+                payload=unit_goal,
+                expectations=[
+                    VerifierExpectation(
+                        metric=f"unit_count_{unit_goal['unit']}",
+                        operator=">=",
+                        value=unit_goal["count"],
+                        description=f"produce {unit_goal['count']} {unit_goal['unit']}",
+                    )
+                ],
+                utterance_id=utterance.utterance_id,
+            )
+        )
+
     style = _parse_style(lower)
     if style:
         commands.append(
@@ -276,6 +345,68 @@ def _parse_expansion_goal(text: str) -> dict[str, int | str] | None:
     return None
 
 
+def _parse_structure_goals(text: str) -> list[dict[str, object]]:
+    goals: list[dict[str, object]] = []
+    patterns = {
+        "spire": ["스파이어", "spire"],
+        "factory": ["팩토리", "factory"],
+        "gateway": ["게이트", "gateway"],
+        "robotics_facility": ["로보틱스", "robotics"],
+        "sunken_colony": ["성큰", "sunken"],
+        "photon_cannon": ["캐논", "cannon"],
+        "missile_turret": ["터렛", "turret"],
+    }
+    for segment in _segments(text):
+        if not any(token in segment for token in ["지어", "건설", "build", "박아"]):
+            continue
+        count = _first_number(segment) or 1
+        for structure, tokens in patterns.items():
+            if any(token in segment for token in tokens):
+                goals.append({"structure": structure, "count": count})
+    return goals
+
+
+def _parse_upgrade_goals(text: str) -> list[dict[str, object]]:
+    goals: list[dict[str, object]] = []
+    patterns = {
+        "dragoon_range": ["드라군 사업", "사업", "dragoon range", "goon range"],
+        "siege_mode": ["시즈모드", "시즈 모드", "siege mode"],
+        "spider_mines": ["마인업", "마인 업", "spider mines"],
+        "zergling_speed": ["링 발업", "저글링 발업", "ling speed"],
+        "lurker_aspect": ["럴커 업", "lurker aspect"],
+    }
+    for segment in _segments(text):
+        if not any(token in segment for token in ["업", "연구", "먼저", "research", "upgrade", "사업", "mode"]):
+            continue
+        for upgrade, tokens in patterns.items():
+            if any(token in segment for token in tokens):
+                goals.append({"upgrade": upgrade})
+    return goals
+
+
+def _parse_unit_goals(text: str) -> list[dict[str, object]]:
+    goals: list[dict[str, object]] = []
+    patterns = {
+        "mutalisk": ["뮤탈", "mutalisk", "muta"],
+        "zergling": ["저글링", "링 ", "zergling"],
+        "dragoon": ["드라군", "dragoon", "goon"],
+        "reaver": ["리버", "reaver"],
+        "vulture": ["벌처", "vulture"],
+        "siege_tank": ["탱크", "tank"],
+        "marine": ["마린", "marine"],
+    }
+    for segment in _segments(text):
+        if not any(token in segment for token in ["찍", "생산", "뽑", "produce", "make"]):
+            continue
+        count = _first_number(segment)
+        if count is None:
+            continue
+        for unit, tokens in patterns.items():
+            if any(token in segment for token in tokens):
+                goals.append({"unit": unit, "count": count, "mode": "at_least"})
+    return goals
+
+
 def _parse_cancel(text: str) -> dict[str, object] | None:
     if not any(token in text for token in ["취소", "그만", "cancel", "stop"]):
         return None
@@ -376,3 +507,7 @@ def _first_number(text: str) -> int | None:
         if word in text:
             return value
     return None
+
+
+def _segments(text: str) -> list[str]:
+    return [segment.strip() for segment in re.split(r"[.。!?]|(?:\s+그리고\s+)|(?:\s+and\s+)", text) if segment.strip()]

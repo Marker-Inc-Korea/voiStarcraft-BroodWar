@@ -45,3 +45,15 @@ def test_parse_cancel_strategy_command() -> None:
     assert command.action == "cancel_intent"
     assert command.payload == {"target_action": "commit_strategy", "target_plan": "two_hatch_muta"}
     assert command.expectations[0].metric == "cancelled_command_count"
+
+
+def test_parse_structure_upgrade_and_unit_goals() -> None:
+    commands = parse_utterance(CommandUtterance(text="스파이어 지어. 드라군 사업 먼저. 벌처 3기 생산해."))
+
+    structure = next(command for command in commands if command.action == "build_structure")
+    upgrade = next(command for command in commands if command.action == "research_upgrade")
+    unit = next(command for command in commands if command.action == "produce_unit")
+
+    assert structure.payload == {"structure": "spire", "count": 1}
+    assert upgrade.payload == {"upgrade": "dragoon_range"}
+    assert unit.payload == {"unit": "vulture", "count": 3, "mode": "at_least"}

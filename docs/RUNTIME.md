@@ -21,6 +21,10 @@ Default queue format is JSON Lines. Each line is a validated `ParsedCommand` dic
 python -m voi_bw_commander.cli parse "저그 드론 5개 더" --queue runtime/commands.jsonl
 ```
 
+Bot-side `onFrame` consumers must use cursor-based polling. `bot_bridge/CommanderBridge.hpp`
+provides `pollNew()` so commands are not replayed every frame and invalid queue lines are
+isolated as invalid envelopes instead of being blindly applied.
+
 ## Stateful Commander Run
 
 ```bash
@@ -36,11 +40,80 @@ PYTHONPATH=src python3 -m voi_bw_commander.cli apply \
 PYTHONPATH=src python3 -m voi_bw_commander.cli report runtime/telemetry.jsonl
 ```
 
+Replay-derived metrics can be normalized into telemetry JSONL from JSON, JSONL, or CSV:
+
+```bash
+PYTHONPATH=src python3 -m voi_bw_commander.cli replay-ingest runtime/replay_metrics.csv --output runtime/telemetry.jsonl
+```
+
+Native `.rep` decoding is an external runtime boundary. The production contract is that a
+BWAPI/replay exporter emits frame or aggregate metrics, then this repo normalizes them for
+reports and verifier checks.
+
 ## Backend Audit
 
 ```bash
 PYTHONPATH=src python3 -m voi_bw_commander.cli audit-source Steamhammer third_party/Steamhammer
 ```
+
+## Source-Level Hook Plans
+
+Generate per-backend patch plans before changing third-party bot code:
+
+```bash
+PYTHONPATH=src python3 -m voi_bw_commander.cli hook-plan --backend McRave
+PYTHONPATH=src python3 -m voi_bw_commander.cli hook-plan --output-dir runtime/hook-plans
+```
+
+The plans cover `on_frame`, `strategy`, `production`, `squad`, `micro`, and `telemetry`
+for McRave, Stardust, Ecgberht, Steamhammer, and PurpleWave. They intentionally place
+intent influence inside the bot's own decision loop rather than issuing external unit
+commands that fight the bot planner.
+
+## Input Surfaces
+
+Voice and UI should terminate in transcript text, then append validated commands to the
+queue:
+
+```bash
+PYTHONPATH=src python3 -m voi_bw_commander.cli transcript --text "저그 드론 5개 더" --queue runtime/commands.jsonl
+PYTHONPATH=src python3 -m voi_bw_commander.cli transcript --file runtime/transcript.txt --queue runtime/commands.jsonl
+PYTHONPATH=src python3 -m voi_bw_commander.cli write-ui --output runtime/commander.html --queue runtime/commands.jsonl
+```
+
+The committed `ui/commander.html` is a static handoff surface. Production deployments can
+wrap it with a local service, but the game process should still consume only the validated
+JSONL queue.
+
+## Live LLM Provider
+
+Strict JSON validation remains mandatory. Optional live provider parsing uses an
+OpenAI-compatible chat-completions endpoint:
+
+```bash
+OPENAI_API_KEY=... VOI_LLM_MODEL=gpt-4.1-mini \
+PYTHONPATH=src python3 -m voi_bw_commander.cli parse-llm-live "테란 벌처 3기 생산하고 마인업"
+```
+
+Environment variables:
+
+- `OPENAI_API_KEY` or `VOI_LLM_API_KEY`
+- `VOI_LLM_MODEL`
+- `VOI_LLM_BASE_URL`
+- `VOI_LLM_TIMEOUT_SECONDS`
+
+Provider output is never trusted directly; it must pass `StrictLLMCommandParser`.
+
+## StarData / V3 Representation
+
+Trajectory rows exported from StarData-style datasets can be converted into intent labels:
+
+```bash
+PYTHONPATH=src python3 -m voi_bw_commander.cli stardata-features trajectories.jsonl --output runtime/features.jsonl
+```
+
+The feature schema emits `aggression`, `defensive`, `harass`, `contain`, and `greed`
+signals for future classifier training and intent-adherence calibration.
 
 ## Match Plan
 
@@ -80,7 +153,10 @@ Actual Brood War execution requires:
 - Bot source or binary.
 - Map pool and replay/log directories.
 
-This repository currently provides the commander core and adapter contract. A concrete bot repository must pass the commandability audit before its source hooks are implemented.
+This repository provides the commander core, adapter contract, source-level hook plans,
+input surfaces, LLM provider gate, replay metric ingestion, and V3 representation surface.
+A concrete bot repository must still pass commandability audit and receive source-level
+decision-loop hooks before live Brood War execution is claimed complete.
 
 ## Version Contract
 
@@ -108,10 +184,12 @@ runtime/
 1. Run `scripts/verify_local.sh`.
 2. Run `PYTHONPATH=src python3 -m voi_bw_commander.cli readiness --root .`.
 3. Audit the target bot source with `audit-source`.
-4. Generate a `match-plan` or `benchmark-plan`.
-5. Start Brood War/BWAPI with the selected bot and queue path.
-6. Send commands only through `parse --queue` or the validated commander service.
-7. Generate `report` or `compare-report` from telemetry after the match.
+4. Generate `hook-plan` and patch the target bot's source-level decision points.
+5. Generate a `match-plan` or `benchmark-plan`.
+6. Start Brood War/BWAPI with the selected bot and queue path.
+7. Send commands only through `parse --queue`, `transcript`, `parse-llm-live`, or the validated commander service.
+8. Normalize replay-derived metrics with `replay-ingest` if needed.
+9. Generate `report` or `compare-report` from telemetry after the match.
 
 ## Failure Handling
 
