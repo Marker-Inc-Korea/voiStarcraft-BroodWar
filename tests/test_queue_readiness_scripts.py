@@ -23,6 +23,9 @@ def test_repository_readiness_passes() -> None:
     report = check_runtime(__import__("pathlib").Path.cwd())
 
     assert report.ready
+    names = {check.name for check in report.checks}
+    assert "CI workflow" in names
+    assert "parser corpus" in names
 
 
 def test_state_store_replays_persisted_contract(tmp_path) -> None:
