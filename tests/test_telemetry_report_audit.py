@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from voi_bw_commander.audit import audit_source_tree
-from voi_bw_commander.replay_report import build_report
+from voi_bw_commander.replay_report import build_report, compare_reports
 from voi_bw_commander.telemetry import TelemetryLog
 
 
@@ -33,3 +33,20 @@ def test_audit_source_tree_detects_hooks(tmp_path: Path) -> None:
     report = audit_source_tree("FakeBot", tmp_path)
 
     assert report.promotable
+
+
+def test_compare_reports_computes_commanded_deltas(tmp_path) -> None:
+    baseline = TelemetryLog(tmp_path / "baseline.jsonl")
+    commanded = TelemetryLog(tmp_path / "commanded.jsonl")
+    baseline.write("intent_adherence", {"score": 0.4})
+    baseline.write("command_status", {"status": "fulfilled"})
+    commanded.write("intent_adherence", {"score": 0.8})
+    commanded.write("command_status", {"status": "fulfilled"})
+    commanded.write("command_status", {"status": "unsafe"})
+    commanded.write("command_status", {"status": "degraded"})
+
+    report = compare_reports(baseline.read(), commanded.read())
+
+    assert report.adherence_delta == 0.4
+    assert report.safety_override_delta == 1
+    assert report.degraded_delta == 1

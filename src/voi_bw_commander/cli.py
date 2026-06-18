@@ -14,7 +14,7 @@ from .models import CommandStatus, CommandUtterance, IntentState
 from .parser import parse_utterance
 from .queue import CommandQueue, command_to_dict
 from .readiness import check_runtime
-from .replay_report import build_report
+from .replay_report import build_report, compare_reports
 from .runner import MatchSpec
 from .safety import SafetyPolicy
 from .store import StateStore
@@ -45,6 +45,10 @@ def main(argv: list[str] | None = None) -> int:
 
     report_cmd = sub.add_parser("report", help="Build a report from telemetry JSONL.")
     report_cmd.add_argument("telemetry", type=Path)
+
+    compare_cmd = sub.add_parser("compare-report", help="Compare baseline and commanded telemetry JSONL reports.")
+    compare_cmd.add_argument("baseline", type=Path)
+    compare_cmd.add_argument("commanded", type=Path)
 
     audit_cmd = sub.add_parser("audit-source", help="Audit a backend source tree for commandability.")
     audit_cmd.add_argument("backend")
@@ -77,6 +81,8 @@ def main(argv: list[str] | None = None) -> int:
         return _parse_llm_json(args.json_text)
     if args.command == "report":
         return _report(args.telemetry)
+    if args.command == "compare-report":
+        return _compare_report(args.baseline, args.commanded)
     if args.command == "audit-source":
         return _audit_source(args.backend, args.path)
     if args.command == "match-plan":
@@ -188,6 +194,12 @@ def _parse_llm_json(json_text: str) -> int:
 
 def _report(telemetry_path: Path) -> int:
     report = build_report(TelemetryLog(telemetry_path).read())
+    print(json.dumps(report.to_dict(), ensure_ascii=False, indent=2, sort_keys=True))
+    return 0
+
+
+def _compare_report(baseline_path: Path, commanded_path: Path) -> int:
+    report = compare_reports(TelemetryLog(baseline_path).read(), TelemetryLog(commanded_path).read())
     print(json.dumps(report.to_dict(), ensure_ascii=False, indent=2, sort_keys=True))
     return 0
 
