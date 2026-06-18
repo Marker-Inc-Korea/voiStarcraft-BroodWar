@@ -1,5 +1,5 @@
-from voi_bw_commander.adapters import BotAdapter
-from voi_bw_commander.backends import default_manifest
+from voi_bw_commander.adapters import BotAdapter, create_race_adapter
+from voi_bw_commander.backends import default_manifest, race_primary_manifest
 from voi_bw_commander.models import (
     BackendCapability,
     CapabilityManifest,
@@ -90,3 +90,24 @@ def test_cancel_command_removes_matching_active_intent() -> None:
     assert result.accepted[0]["status"] == "fulfilled"
     assert not state.contract.strategic_commitments
     assert state.memory.cancelled
+
+
+def test_race_specific_adapter_resolves_worker_payload() -> None:
+    state = IntentState()
+    adapter = create_race_adapter(race_primary_manifest(Race.TERRAN), Race.TERRAN)
+
+    result = adapter.apply(state, parse_utterance(CommandUtterance(text="일꾼 5개 더")))
+
+    assert result.accepted
+    [goal] = list(state.contract.hard_goals.values())
+    assert goal.payload["unit_type"] == "SCV"
+
+
+def test_race_specific_adapter_rejects_illegal_strategy() -> None:
+    state = IntentState()
+    adapter = create_race_adapter(race_primary_manifest(Race.PROTOSS), Race.PROTOSS)
+
+    result = adapter.apply(state, parse_utterance(CommandUtterance(text="2햇 뮤탈")))
+
+    assert result.rejected
+    assert "not legal for Protoss" in result.rejected[0]["reason"]

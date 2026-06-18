@@ -100,3 +100,17 @@ def default_manifest(name: str = "SteamhammerVerticalSlice") -> CapabilityManife
         integration_level=4,
         notes="Local production contract manifest. Real bot hooks require commandability audit and source patch.",
     )
+
+
+def race_primary_manifest(race: Race) -> CapabilityManifest:
+    names = {
+        Race.ZERG: "McRaveZergAdapter",
+        Race.PROTOSS: "StardustProtossAdapter",
+        Race.TERRAN: "EcgberhtTerranAdapter",
+    }
+    if race not in names:
+        return default_manifest()
+    manifest = default_manifest(names[race])
+    manifest.race_support = {race}
+    manifest.notes = f"Race-specific primary commandable manifest for {race.value}; source hooks still require bot checkout."
+    return manifest
