@@ -26,6 +26,33 @@ def test_arbiter_biases_toward_worker_goal_and_harass_style() -> None:
     assert choice.final_score > 1.0
 
 
+def test_arbiter_applies_expansion_hard_goal_bonus() -> None:
+    state = IntentState()
+    BotAdapter(default_manifest()).apply(state, parse_utterance(CommandUtterance(text="이제 3멀티는 먹어")))
+
+    choice = IntentArbiter().choose(
+        state,
+        [
+            ActionCandidate("train_army", 0.8, ("army",)),
+            ActionCandidate("take_third", 0.7, ("expand",)),
+        ],
+    )
+
+    assert choice.action == "take_third"
+    assert "hard_goal:take_expansion=0.90" in choice.explanation
+
+
+def test_arbiter_penalizes_frontal_fight_when_doctrine_avoids_main_army() -> None:
+    state = IntentState()
+    BotAdapter(default_manifest()).apply(state, parse_utterance(CommandUtterance(text="정면 싸움은 피하고 일꾼만 흔들어")))
+
+    frontal = IntentArbiter().score(state, ActionCandidate("frontal_attack", 0.9, ("attack", "frontal", "main_army")))
+    harass = IntentArbiter().score(state, ActionCandidate("worker_harass", 0.7, ("attack", "harass")))
+
+    assert harass.final_score > frontal.final_score
+    assert "micro_doctrine:avoid_main_army=-1.00" in frontal.explanation
+
+
 def test_safety_blocks_forced_attack_when_enemy_advantage_is_large() -> None:
     state = IntentState()
     [command] = parse_utterance(CommandUtterance(text="지금 공격해"))
