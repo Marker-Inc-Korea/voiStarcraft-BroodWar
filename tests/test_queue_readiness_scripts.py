@@ -73,3 +73,33 @@ def test_cli_apply_writes_safety_stage_telemetry(tmp_path) -> None:
 
     assert '"status": "invalid"' in telemetry.read_text(encoding="utf-8")
     assert '"category": "invalid"' in telemetry.read_text(encoding="utf-8")
+
+
+def test_cli_benchmark_plan_includes_regression_outputs(tmp_path) -> None:
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "voi_bw_commander.cli",
+            "benchmark-plan",
+            "--bot",
+            "Steamhammer",
+            "--race",
+            "Zerg",
+            "--map",
+            "FightingSpirit",
+            "--root",
+            str(tmp_path),
+            "--opponent",
+            "PurpleWave",
+        ],
+        check=True,
+        capture_output=True,
+        env={**os.environ, "PYTHONPATH": "src"},
+        text=True,
+    )
+
+    assert "baseline_plan" in result.stdout
+    assert "commanded_plan" in result.stdout
+    assert "compare-report JSON" in result.stdout
+    assert "desync marker" in result.stdout
