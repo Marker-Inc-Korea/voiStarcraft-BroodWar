@@ -31,6 +31,9 @@ def check_runtime(root: Path) -> ReadinessReport:
         _exists("bot bridge template", root / "bot_bridge" / "CommanderBridge.hpp"),
         _exists("runtime docs", root / "docs" / "RUNTIME.md"),
         _exists("verification script", root / "scripts" / "verify_local.sh"),
+        _exists("parser corpus", root / "fixtures" / "parser_corpus.json"),
+        _exists("CI workflow", root / ".github" / "workflows" / "ci.yml"),
+        _exists("issue completion matrix", root / "docs" / "ISSUE_COMPLETION_MATRIX.md"),
     )
     return ReadinessReport(checks)
 
