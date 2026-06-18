@@ -21,6 +21,18 @@
     },
     "strength": { "type": "number", "minimum": 0, "maximum": 1 },
     "duration": { "type": "string" },
+    "adaptivity": {
+      "enum": ["fixed", "adaptive", "opportunistic", "safety_breakable"]
+    },
+    "conflict_policy": {
+      "enum": [
+        "stack",
+        "replace_scope",
+        "suppress_lower_priority",
+        "require_confirmation",
+        "safety_override"
+      ]
+    },
     "payload": { "type": "object" },
     "expectations": {
       "type": "array",

@@ -26,3 +26,14 @@ def test_unparsed_command_requires_clarification() -> None:
     assert command.action == "unparsed"
     assert command.payload["requires_clarification"] is True
     assert command.ambiguity_score == 1.0
+
+
+def test_parse_contract_patch_with_expansion_goal() -> None:
+    commands = parse_utterance(CommandUtterance(text="아까 침략 스타일 유지하되 이제 3멀티는 먹어"))
+
+    expansion = next(command for command in commands if command.action == "take_expansion")
+    patch = next(command for command in commands if command.action == "patch_contract")
+
+    assert expansion.payload["base_number"] == 3
+    assert expansion.expectations[0].metric == "owned_bases"
+    assert patch.payload["preserve_existing"] is True

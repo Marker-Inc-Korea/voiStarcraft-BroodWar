@@ -1,6 +1,14 @@
 from voi_bw_commander.adapters import BotAdapter
 from voi_bw_commander.backends import default_manifest
-from voi_bw_commander.models import BackendCapability, CapabilityManifest, CommandUtterance, IntentState, Race
+from voi_bw_commander.models import (
+    BackendCapability,
+    CapabilityManifest,
+    ConflictPolicy,
+    CommandUtterance,
+    IntentAdaptivity,
+    IntentState,
+    Race,
+)
 from voi_bw_commander.parser import parse_utterance
 
 
@@ -43,3 +51,28 @@ def test_unsupported_micro_doctrine_is_degraded_by_limited_manifest() -> None:
 
     assert result.degraded
     assert state.memory.degraded
+
+
+def test_contract_patch_preserves_style_while_adding_third_base_goal() -> None:
+    state = IntentState()
+    adapter = BotAdapter(default_manifest())
+    adapter.apply(state, parse_utterance(CommandUtterance(text="저그 침략적으로 가고 2햇 뮤탈")))
+
+    result = adapter.apply(state, parse_utterance(CommandUtterance(text="아까 말한 침략 스타일은 유지하되 이제 3멀티는 먹어")))
+
+    assert not result.degraded
+    assert state.contract.style["aggression"] == 0.85
+    assert any(command.action == "take_expansion" for command in state.contract.hard_goals.values())
+    assert any(command.action == "patch_contract" for command in state.memory.active.values())
+
+
+def test_intent_metadata_survives_state_round_trip() -> None:
+    state = IntentState()
+    adapter = BotAdapter(default_manifest())
+    adapter.apply(state, parse_utterance(CommandUtterance(text="지금 공격해")))
+
+    hydrated = IntentState.from_dict(state.to_dict())
+    [command] = list(hydrated.contract.instant_orders.values())
+
+    assert command.adaptivity == IntentAdaptivity.FIXED
+    assert command.conflict_policy == ConflictPolicy.SAFETY_OVERRIDE
