@@ -3,6 +3,7 @@ import os
 import subprocess
 import sys
 import urllib.request
+from pathlib import Path
 
 from voi_bw_commander.input_surfaces import ingest_transcript, render_commander_ui
 from voi_bw_commander.llm import LLMProviderConfig, OpenAICompatibleCommandParser
@@ -165,3 +166,12 @@ def test_new_cli_surfaces_smoke(tmp_path) -> None:
     assert ui.exists()
     assert "intent_adherence" in replay.stdout
     assert "feature_count" in stardata.stdout
+
+
+def test_purplewave_template_uses_cursor_and_project_json_parser() -> None:
+    template = Path("integrations/purplewave/CommanderQueueConsumer.scala").read_text(encoding="utf-8")
+
+    assert "private var byteOffset" in template
+    assert "Arrays.copyOfRange" in template
+    assert "scala.util.parsing.json" not in template
+    assert "import mjson.Json" in template

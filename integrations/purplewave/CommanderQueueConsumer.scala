@@ -1,23 +1,32 @@
 package Commander
 
 import java.nio.charset.StandardCharsets
-import java.nio.file.{Files, Path, Paths}
+import java.nio.file.{Files, Paths}
+import java.util.Arrays
 import scala.collection.JavaConverters._
-import scala.util.parsing.json.JSON
+import mjson.Json
 
 object CommanderQueueConsumer {
-  private var lastBytes: Long = -1L
+  private var byteOffset: Long = 0L
 
   def poll(pathString: String = "runtime/commands.jsonl"): Unit = {
     val path = Paths.get(pathString)
     if (!Files.exists(path)) return
     val bytes = Files.size(path)
-    if (bytes == lastBytes) return
-    lastBytes = bytes
+    if (bytes < byteOffset) byteOffset = 0L
+    if (bytes == byteOffset) return
 
-    val commands = Files
-      .readAllLines(path, StandardCharsets.UTF_8)
-      .asScala
+    val allBytes = Files.readAllBytes(path)
+    val newBytes = Arrays.copyOfRange(allBytes, byteOffset.toInt, allBytes.length)
+    byteOffset = bytes
+
+    val lines = new String(newBytes, StandardCharsets.UTF_8)
+      .split("\n")
+      .map(_.trim)
+      .filter(_.nonEmpty)
+      .toVector
+
+    val commands = lines
       .flatMap(parseCommand)
       .toVector
 
@@ -28,14 +37,42 @@ object CommanderQueueConsumer {
   }
 
   private def parseCommand(line: String): Option[CommanderCommand] = {
-    JSON.parseFull(line).collect { case obj: Map[String @unchecked, Any @unchecked] =>
+    try {
+      val obj = Json.read(line)
+      Some(
       CommanderCommand(
-        id = obj.get("command_id").map(_.toString).getOrElse("unknown"),
-        commandType = obj.get("command_type").map(_.toString).getOrElse("unknown"),
-        action = obj.get("action").map(_.toString).getOrElse("unknown"),
-        payload = obj.get("payload").collect { case payload: Map[String @unchecked, Any @unchecked] => payload }.getOrElse(Map.empty))
+        id = stringField(obj, "command_id", "unknown"),
+        commandType = stringField(obj, "command_type", "unknown"),
+        action = stringField(obj, "action", "unknown"),
+        payload = payloadMap(obj)))
+    } catch {
+      case _: Exception => None
     }
   }
+
+  private def stringField(obj: Json, key: String, fallback: String): String =
+    if (obj.has(key) && ! obj.at(key).isNull) obj.at(key).asString else fallback
+
+  private def payloadMap(obj: Json): Map[String, Any] = {
+    if (! obj.has("payload") || obj.at("payload").isNull) return Map.empty
+    val payload = obj.at("payload")
+    val values = scala.collection.mutable.Map.empty[String, Any]
+    if (payload.has("race")) values("race") = payload.at("race").asString
+    if (payload.has("plan")) values("plan") = payload.at("plan").asString
+    if (payload.has("style") && ! payload.at("style").isNull) {
+      val style = payload.at("style")
+      values("style") = Map(
+        "aggression" -> doubleField(style, "aggression", 0.5),
+        "harass" -> doubleField(style, "harass", 0.5),
+        "economy_greed" -> doubleField(style, "economy_greed", 0.5),
+        "defensive_safety" -> doubleField(style, "defensive_safety", 0.5),
+        "all_in_commitment" -> doubleField(style, "all_in_commitment", 0.2))
+    }
+    values.toMap
+  }
+
+  private def doubleField(obj: Json, key: String, fallback: Double): Double =
+    if (obj.has(key) && ! obj.at(key).isNull) obj.at(key).asDouble else fallback
 
   private def applyCommands(contract: CommanderContract, commands: Vector[CommanderCommand]): CommanderContract = {
     commands.foldLeft(contract) { (next, command) =>
