@@ -1,3 +1,4 @@
+import os
 import subprocess
 import sys
 
@@ -32,3 +33,25 @@ def test_purplewave_patch_script_dry_run() -> None:
     )
 
     assert "patch lifecycle" in result.stdout
+
+
+def test_cli_apply_writes_safety_stage_telemetry(tmp_path) -> None:
+    telemetry = tmp_path / "telemetry.jsonl"
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "voi_bw_commander.cli",
+            "apply",
+            "뭔가 멋지게 해봐",
+            "--telemetry",
+            str(telemetry),
+        ],
+        check=True,
+        capture_output=True,
+        env={**os.environ, "PYTHONPATH": "src"},
+        text=True,
+    )
+
+    assert '"status": "invalid"' in telemetry.read_text(encoding="utf-8")
+    assert '"category": "invalid"' in telemetry.read_text(encoding="utf-8")

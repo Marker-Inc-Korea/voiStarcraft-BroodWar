@@ -32,6 +32,30 @@ def test_safety_blocks_forced_attack_when_enemy_advantage_is_large() -> None:
     decision = SafetyPolicy().evaluate(state, command, {"enemy_army_supply_advantage": 40})
 
     assert decision.status == CommandStatus.UNSAFE
+    assert decision.category == "survival_override"
+    assert decision.details == {"enemy_army_supply_advantage": 40}
+
+
+def test_safety_blocks_economic_hard_goal_during_emergency_defense() -> None:
+    state = IntentState()
+    [command] = parse_utterance(CommandUtterance(text="드론 5개 더"))
+    decision = SafetyPolicy().evaluate(state, command, {"emergency_defense": True})
+
+    assert decision.status == CommandStatus.BLOCKED
+    assert decision.category == "emergency_defense"
+    assert decision.details == {"blocked_action": "produce_worker"}
+
+
+def test_safety_explains_style_conflict_without_rejecting() -> None:
+    state = IntentState()
+    BotAdapter(default_manifest()).apply(state, parse_utterance(CommandUtterance(text="수비적으로 안전하게")))
+    style_command = next(command for command in parse_utterance(CommandUtterance(text="이제 침략적으로 가")) if command.action == "set_style")
+
+    decision = SafetyPolicy().evaluate(state, style_command)
+
+    assert decision.status == CommandStatus.ACCEPTED
+    assert decision.category == "style_conflict"
+    assert "arbiter will balance" in decision.reason
 
 
 def test_verifier_scores_expectations() -> None:

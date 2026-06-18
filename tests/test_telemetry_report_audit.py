@@ -9,12 +9,16 @@ def test_telemetry_report_counts_statuses(tmp_path) -> None:
     log = TelemetryLog(tmp_path / "telemetry.jsonl")
     log.write("command_status", {"status": "fulfilled"})
     log.write("command_status", {"status": "degraded"})
+    log.write("command_status", {"status": "blocked"})
+    log.write("command_status", {"status": "active", "category": "style_conflict"})
     log.write("intent_adherence", {"score": 0.8})
 
     report = build_report(log.read())
 
-    assert report.command_fulfillment_rate == 0.5
+    assert report.command_fulfillment_rate == 0.25
     assert report.intent_adherence_score == 0.8
+    assert report.blocked_count == 1
+    assert report.conflict_count == 1
     assert report.degraded_count == 1
 
 
