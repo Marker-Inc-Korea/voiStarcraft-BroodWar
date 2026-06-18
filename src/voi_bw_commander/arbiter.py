@@ -50,13 +50,26 @@ class IntentArbiter:
         for goal in state.contract.hard_goals.values():
             if goal.action == "produce_worker" and "worker" in candidate.tags:
                 score += 1.0
-                reasons.append("hard_goal_bonus=1.00")
+                reasons.append("hard_goal:produce_worker=1.00")
+            if goal.action == "take_expansion" and "expand" in candidate.tags:
+                score += 0.9
+                reasons.append("hard_goal:take_expansion=0.90")
 
         for commitment in state.contract.strategic_commitments.values():
             plan = commitment.payload.get("plan")
             if plan and plan in candidate.tags:
                 score += commitment.strength
                 reasons.append(f"strategic_commitment:{plan}={commitment.strength:.2f}")
+
+        for doctrine in state.contract.standing_orders.values():
+            avoid = tuple(doctrine.payload.get("avoid", ()))
+            rule = doctrine.payload.get("rule")
+            if "main_army" in avoid and {"frontal", "main_army"} & set(candidate.tags):
+                score -= 1.0
+                reasons.append("micro_doctrine:avoid_main_army=-1.00")
+            if rule == "retreat_low_hp" and "retreat" in candidate.tags:
+                score += 0.7
+                reasons.append("micro_doctrine:retreat_low_hp=0.70")
 
         return ScoredAction(candidate.action, round(score, 4), tuple(reasons))
 
