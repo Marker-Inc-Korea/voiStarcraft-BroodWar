@@ -26,6 +26,26 @@ class ReplayReport:
         }
 
 
+@dataclass
+class ComparisonReport:
+    baseline: ReplayReport
+    commanded: ReplayReport
+    fulfillment_delta: float
+    adherence_delta: float
+    safety_override_delta: int
+    degraded_delta: int
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "baseline": self.baseline.to_dict(),
+            "commanded": self.commanded.to_dict(),
+            "fulfillment_delta": self.fulfillment_delta,
+            "adherence_delta": self.adherence_delta,
+            "safety_override_delta": self.safety_override_delta,
+            "degraded_delta": self.degraded_delta,
+        }
+
+
 def build_report(events: list[dict[str, Any]]) -> ReplayReport:
     command_events = [event for event in events if event.get("event_type") == "command_status"]
     fulfilled = [event for event in command_events if event.get("payload", {}).get("status") == "fulfilled"]
@@ -65,4 +85,17 @@ def build_report(events: list[dict[str, Any]]) -> ReplayReport:
         conflict_count=conflict_count,
         degraded_count=degraded_count,
         details=[f"command_events={len(command_events)}", f"adherence_samples={len(adherence_scores)}"],
+    )
+
+
+def compare_reports(baseline_events: list[dict[str, Any]], commanded_events: list[dict[str, Any]]) -> ComparisonReport:
+    baseline = build_report(baseline_events)
+    commanded = build_report(commanded_events)
+    return ComparisonReport(
+        baseline=baseline,
+        commanded=commanded,
+        fulfillment_delta=round(commanded.command_fulfillment_rate - baseline.command_fulfillment_rate, 4),
+        adherence_delta=round(commanded.intent_adherence_score - baseline.intent_adherence_score, 4),
+        safety_override_delta=commanded.safety_override_count - baseline.safety_override_count,
+        degraded_delta=commanded.degraded_count - baseline.degraded_count,
     )
