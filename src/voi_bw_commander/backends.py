@@ -13,6 +13,15 @@ class BackendCandidate:
     expected_level: str
     rationale: str
 
+    def to_dict(self) -> dict[str, str]:
+        return {
+            "name": self.name,
+            "language": self.language,
+            "role": self.role,
+            "expected_level": self.expected_level,
+            "rationale": self.rationale,
+        }
+
 
 BACKEND_CANDIDATES: tuple[BackendCandidate, ...] = (
     BackendCandidate(
@@ -44,6 +53,13 @@ BACKEND_CANDIDATES: tuple[BackendCandidate, ...] = (
         "Protoss full-game BWAPI bot with source-level integration potential.",
     ),
     BackendCandidate(
+        "Locutus",
+        "C++",
+        "Protoss secondary commandable candidate",
+        "2-4",
+        "Protoss Steamhammer fork candidate with BWEB/BWEM integration costs.",
+    ),
+    BackendCandidate(
         "Ecgberht",
         "Java",
         "Terran primary candidate",
@@ -56,6 +72,13 @@ BACKEND_CANDIDATES: tuple[BackendCandidate, ...] = (
         "Terran secondary candidate",
         "2-4",
         "Terran bot candidate for source-level audit.",
+    ),
+    BackendCandidate(
+        "ZZZKBot",
+        "C++",
+        "Zerg aggressive benchmark / optional adapter",
+        "0-3 after source audit",
+        "Zerg bot competition candidate; commandability depends on source hook quality.",
     ),
     BackendCandidate(
         "SAIDA",
@@ -71,6 +94,22 @@ BACKEND_CANDIDATES: tuple[BackendCandidate, ...] = (
         "0-1 until source hooks are proven",
         "Strong Terran benchmark; commandability must be proven.",
     ),
+)
+
+
+EXCLUDED_PLAYABLE_BACKENDS: tuple[dict[str, str], ...] = (
+    {
+        "name": "SparCraft/FAP",
+        "reason": "combat simulator, not a full-game autonomous backend",
+    },
+    {
+        "name": "TorchCraftAI micro scenarios",
+        "reason": "research/micro scenario platform, not a full 1v1 melee bot backend",
+    },
+    {
+        "name": "StarData",
+        "reason": "replay dataset for learning/evaluation, not a playable bot",
+    },
 )
 
 

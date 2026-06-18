@@ -7,7 +7,7 @@ from pathlib import Path
 from .adapters import BotAdapter
 from .audit import audit_source_tree, decide_commandability
 from .arbiter import ActionCandidate, IntentArbiter
-from .backends import BACKEND_CANDIDATES, default_manifest
+from .backends import BACKEND_CANDIDATES, EXCLUDED_PLAYABLE_BACKENDS, default_manifest
 from .benchmark import build_regression_suite
 from .eval import evaluate_corpus
 from .llm import StrictLLMCommandParser
@@ -174,7 +174,17 @@ def _apply(text: str, state_path: Path | None = None, telemetry_path: Path | Non
 
 
 def _candidates() -> int:
-    print(json.dumps([candidate.__dict__ for candidate in BACKEND_CANDIDATES], ensure_ascii=False, indent=2))
+    print(
+        json.dumps(
+            {
+                "playable_candidates": [candidate.to_dict() for candidate in BACKEND_CANDIDATES],
+                "excluded_playable_backends": list(EXCLUDED_PLAYABLE_BACKENDS),
+            },
+            ensure_ascii=False,
+            indent=2,
+            sort_keys=True,
+        )
+    )
     return 0
 
 
